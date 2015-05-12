@@ -139,6 +139,29 @@ ABRStringStore.prototype.dump = function (node) {
     return out.join('');
 };
 
+ABRStringStore.prototype.toArray = function (node, out, maxLen) {
+    out = out || [];
+    maxLen = maxLen || 10000;
+    if (node.depth < 0 || out.length >= maxLen) {
+        //no action
+    }
+    else if (node.depth === 0) {
+        out.push(node.content);
+    }
+    else if (node.depth & 1) {
+        var count = node.content[0];
+        while (out.length < maxLen && count--) { //BIGNUM
+            this.toArray(node.content[1],out,maxLen);
+        }
+    }
+    else {
+        node.content.forEach(function (nn) {
+            this.toArray(nn,out,maxLen);
+        }, this);
+    }
+    return out;
+};
+
 // We use a 2-step range compaction process, first employing the node codes to
 // reduce to 31 cases, then using THREE_OF_SEVEN to go to 7.  Local maxima are
 // then extracted, giving an extreme block of 14; but we need to look one
@@ -186,7 +209,7 @@ ABRStringStore.prototype.concat = function (x,y) {
 
         if (left_depth === max_depth) {
             left_suf = me._segmentToRuns(left_suf); //explode segments in left_suf into tagged runs
-            left_wontchange = left_suf.length - (CONCAT_WINDOW + 1 + DELTA_R); //mark rightmost CONCAT_WINDOW+1+DELTA_R (the could-change region, incl. retagging)
+            left_wontchange = Math.max(0,left_suf.length - (CONCAT_WINDOW + 1 + DELTA_R)); //mark rightmost CONCAT_WINDOW+1+DELTA_R (the could-change region, incl. retagging)
             left_recurse_buffer = me._runsExtractRight(left_suf, CONCAT_WINDOW); //extract CONCAT_WINDOW right-side depth i-1 signatures
         }
         else {
@@ -196,20 +219,20 @@ ABRStringStore.prototype.concat = function (x,y) {
         }
 
         if (right_depth === max_depth) {
-            right_suf = me._segmentToRuns(right_suf);
-            right_wontchange = right_suf.length - (CONCAT_WINDOW + 1 + DELTA_L);
-            right_recurse_buffer = me._runsExtractLeft(right_suf, CONCAT_WINDOW);
+            right_pref = me._segmentToRuns(right_pref);
+            right_wontchange = Math.max(0,right_pref.length - (CONCAT_WINDOW + 1 + DELTA_L));
+            right_recurse_buffer = me._runsExtractLeft(right_pref, CONCAT_WINDOW);
         }
         else {
-            right_recurse_buffer = right_suf;
+            right_recurse_buffer = right_pref;
             right_wontchange = 0;
-            right_suf = [];
+            right_pref = [];
         }
 
         var recurse_out = recurse(left_recurse_buffer, right_recurse_buffer);
 
         me._runsAppendSigs(left_suf, recurse_out); //convert recurse_out into runs, append to left_suf
-        me._runsAppendRuns(left_suf, right_suf); //merge runs from right_pref
+        me._runsAppendRuns(left_suf, right_pref); //merge runs from right_pref
         me._computeSegmentation(left_suf, left_wontchange, right_wontchange); //recompute all segmentation symbols betweeen left_wontchange and right_wontchange
         return me._runsToSegments(left_suf); //convert back to segments
     };

@@ -27,8 +27,52 @@ describe('The string store object', function () {
     });
     // that's about all we can do without being hypersensitive to details of the segmenter
 
-    new ABRStringStore().fromArray([1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20]);
-    new ABRStringStore().fromArray([1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20]);
-    new ABRStringStore().fromArray([1,2,3,4,5,5,5,8,9,10]);
-    new ABRStringStore().fromArray([1,2,3,4,5,1,2,3,4,6]);
+    // generate ranges (as arrays)
+    function range(lo, hi, mod) {
+        var out = [];
+        for (var i = lo; i <= hi; i++)
+            out.push(mod ? i % mod : i);
+        return out;
+    }
+
+    // the Thue-Morse sequence is highly repetitive but cube-free, so repeat counts will never exceed 2
+    function thue(order) {
+        var t0 = ss.singleton(0), t1 = ss.singleton(1); // t0 = Thue-Morse at current order; t1 = reversed complement
+
+        while (order--) {
+            var tn0 = ss.concat(t0,t1);
+            var tn1 = ss.concat(t1,t0);
+            t0 = tn0; t1 = tn1;
+        }
+        return t0;
+    }
+
+    describe('Round-tripping', function () {
+        it('preserves a non-repeating sequence', function () { expect(ss.toArray(ss.fromArray(range(1,100)),[],200)).toEqual(range(1,100)); });
+        it('preserves a highly repeating sequence', function () { expect(ss.toArray(ss.fromArray(range(1,100,3)),[],200)).toEqual(range(1,100,3)); });
+        it('preserves a structured nonrepeating sequnce', function () { expect(ss.toArray(thue(3))).toEqual([0,1,1,0,1,0,0,1]); });
+    });
+
+    describe('Canonical concatenation', function () {
+        it('non-repeating sequence, 70/30 split', function () { expect(ss.concat(ss.fromArray(range(1,70)),ss.fromArray(range(71,100)))).toBe(ss.fromArray(range(1,100))); });
+        it('non-repeating sequence, 99/1 split', function () { expect(ss.concat(ss.fromArray(range(1,99)),ss.fromArray(range(100,100)))).toBe(ss.fromArray(range(1,100))); });
+        it('non-repeating sequence, 100/0 split', function () { expect(ss.concat(ss.fromArray(range(1,100)),ss.fromArray(range(101,100)))).toBe(ss.fromArray(range(1,100))); });
+        it('non-repeating sequence, incremental construction', function () {
+            var str = ss.emptyString;
+            for (var i = 1; i <= 100; i++) str = ss.concat(str, ss.singleton(i));
+            expect(str).toBe(ss.fromArray(range(1,100)));
+        });
+        it('repeating sequence, 70/30 split', function () { expect(ss.concat(ss.fromArray(range(1,70,3)),ss.fromArray(range(71,100,3)))).toBe(ss.fromArray(range(1,100,3))); });
+        it('repeating sequence, 99/1 split', function () { expect(ss.concat(ss.fromArray(range(1,99,3)),ss.fromArray(range(100,100,3)))).toBe(ss.fromArray(range(1,100,3))); });
+        it('repeating sequence, incremental construction', function () {
+            var str = ss.emptyString;
+            for (var i = 1; i <= 100; i++) str = ss.concat(str, ss.singleton(i % 3));
+            expect(str).toBe(ss.fromArray(range(1,100, 3)));
+        });
+    });
+
+    //new ABRStringStore().fromArray([1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20]);
+    //new ABRStringStore().fromArray([1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20]);
+    //new ABRStringStore().fromArray([1,2,3,4,5,5,5,8,9,10]);
+    //new ABRStringStore().fromArray([1,2,3,4,5,1,2,3,4,6]);
 });
