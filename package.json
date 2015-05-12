@@ -1,0 +1,29 @@
+{
+  "name": "smetamath",
+  "version": "0.1.0",
+  "description": "sorear metamath toolkit",
+  "main": "index.js",
+  "scripts": {
+    "test": "?"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sorear/smetamath.git"
+  },
+  "keywords": [
+    "metamath"
+  ],
+  "author": "Stefan O'Rear",
+  "license": "MIT",
+  "private": true,
+  "bugs": {
+    "url": "https://github.com/sorear/smetamath/issues"
+  },
+  "homepage": "https://github.com/sorear/smetamath#readme",
+  "devDependencies": {
+    "jasmine": "^2.3.1"
+  },
+  "dependencies": {
+    "requirejs": "^2.1.17"
+  }
+}
