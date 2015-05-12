@@ -66,6 +66,7 @@ function ABRStringNode(store, depth, content) {
         this.code = 0;
     }
     //console.log(this);
+    //console.log(store.dump(this));
 }
 
 ABRStringStore._nextSameWeight = nextSameWeight;
@@ -104,12 +105,12 @@ ABRStringStore.prototype.dump = function (node) {
         if (alias_map.has(nn)) {
             if (used_once.has(nn)) {
                 out.push('$'+alias_map.get(nn));
+                return;
             }
             else {
                 out.push('#'+alias_map.get(nn)+'=');
                 used_once.add(nn);
             }
-            return;
         }
 
         if (nn.depth < 0) {
@@ -133,6 +134,7 @@ ABRStringStore.prototype.dump = function (node) {
     };
 
     scan(node);
+    used_once.clear();
     render(node);
     return out.join('');
 };
@@ -329,18 +331,18 @@ ABRStringStore.prototype._computeSegmentation = function (runs, left_fixed, righ
     }
 
     //console.log(runs, left_fixed, right_fixed);
-    for (i = left_fixed-3; i < endix; i++) {
-        codes[i+3] = (i < 0) ? 0 : runs[i].code;
+    for (i = Math.max(0,left_fixed-3); i < endix; i++) {
+        codes[i+3] = runs[i].run.code;
     }
 
-    for (i = left_fixed-2; i < endix; i++) {
-        var xor = (i === 0 ? 0 : codes[i+2]) ^ codes[i+3];
-        pack1[i+3] = THREE_OF_SEVEN[UNPOW2[ (xor &~ (xor-1)) % 37 ]];
+    for (i = Math.max(0,left_fixed-2); i < endix; i++) {
+        var delta = codes[i+3] & ~(i === 0 ? 0 : codes[i+2]);
+        pack1[i+3] = THREE_OF_SEVEN[UNPOW2[ (delta &~ (delta-1)) % 37 ]];
     }
 
-    for (i = left_fixed-1; i < endix; i++) {
-        var xor = (i === 0 ? 0 : pack1[i+2]) ^ pack1[i+3];
-        pack2[i+3] = UNPOW2[ (xor &~ (xor-1)) % 37 ];
+    for (i = Math.max(0,left_fixed-1); i < endix; i++) {
+        var delta = pack1[i+3] & ~(i === 0 ? 0 : pack1[i+2]);
+        pack2[i+3] = UNPOW2[ (delta &~ (delta-1)) % 37 ];
     }
 
     // pack2 is 0-6 coded now.  hunt for local maxima
@@ -349,6 +351,7 @@ ABRStringStore.prototype._computeSegmentation = function (runs, left_fixed, righ
     for (i = left_fixed; i < rlen - right_fixed; i++) {
         runs[i].start = (i === 0 || (i !== 1 && i !== (rlen-1) && pack2[i+3] > pack2[i+2] && pack2[i+3] > pack2[i+4]));
     }
+    //console.log(runs,codes,pack1,pack2,left_fixed,right_fixed);
 };
 
 ABRStringStore.prototype._uproot = function (roots) {
@@ -359,6 +362,11 @@ ABRStringStore.prototype._uproot = function (roots) {
         roots = this._runsToSegments(roots); //convert to segments
     }
     return roots[0];
+};
+
+ABRStringStore.prototype.fromArray = function (a) {
+    if (!a.length) return this.emptyString;
+    return this._uproot(a.map(this.singleton.bind(this)));
 };
 
 // API string from array
