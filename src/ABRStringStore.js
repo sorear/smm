@@ -277,7 +277,12 @@ ABRStringStore.prototype._segmentToRuns = function (segs) {
         var s = segs[i], scon = s.content, sconlen = scon.length, ix;
         for (ix = 0; ix < sconlen; ix++) {
             var run_node = scon[ix];
-            out.push({ run: run_node, sig: run_node.content, repeat: run_node.repeat, start: ix === 0, segm: s });
+            if (run_node.depth & 1) {
+                out.push({ run: run_node, sig: run_node.content, repeat: run_node.repeat, start: ix === 0, segm: s });
+            }
+            else {
+                out.push({ run: run_node, sig: run_node, repeat: bn_one, start: ix === 0, segm: s });
+            }
         }
     }
     return out;
@@ -313,8 +318,7 @@ ABRStringStore.prototype._runsToSegments = function (runs) {
         }
 
         if (!ptr.has(null)) {
-            /*A*/if (!(segment[0].depth & 1)) throw 'run must be of segments';
-            ptr.set(null, new ABRStringNode(this, segment[0].depth+1, segment));
+            ptr.set(null, new ABRStringNode(this, (segment[0].depth|1)+1, segment));
         }
         out.push(ptr.get(null));
     }
@@ -395,6 +399,7 @@ ABRStringStore.prototype._computeSegmentation = function (runs, left_fixed, righ
     for (i = left_fixed; i < rlen - right_fixed; i++) {
         runs[i].segm = null;
         if (runs[i].run) continue;
+        if (bn_equal1(runs[i].repeat)) { runs[i].run = runs[i].sig; continue; }
         var cmap = this._runs.get(runs[i].sig);
         if (!cmap) this._runs.set(runs[i].sig, cmap = new Map());
         var rkey = bn_tokey(runs[i].repeat);
@@ -441,8 +446,8 @@ ABRStringStore.prototype._uproot = function (roots) {
         this._computeSegmentation(roots, 0, 0); //calculate segment borders
         roots = this._runsToSegments(roots); //convert to segments
     }
-    while (roots[0].depth > 0 && roots[0].content.length === 1 && bn_equal1(roots[0].content[0].repeat)) {
-        roots[0] = roots[0].content[0].content;
+    while (roots[0].depth > 0 && roots[0].content.length === 1 && !(roots[0].content[0].depth & 1)) {
+        roots[0] = roots[0].content[0];
     }
     return roots[0];
 };
