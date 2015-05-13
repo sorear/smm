@@ -1,5 +1,5 @@
 var ABRStringStore = require('../src/ABRStringStore.js');
-var argp = require('argparser').defaults({ rounds: 1, cycles: 1000, seed: 1, limit: 1e3, constants: 5 }).nonvals('audit','baseline').parse();
+var argp = require('argparser').defaults({ rounds: 1, cycles: 1000, seed: 1, limit: 1e3, constants: 5, mix: 0.2 }).nonvals('audit','baseline').parse();
 var crypto = require('crypto');
 
 function srand(seed) {
@@ -31,6 +31,7 @@ var cycles = argp.opt('cycles');
 var limit = argp.opt('limit');
 var audit = argp.opt('audit');
 var baseline = argp.opt('baseline');
+var mix = argp.opt('mix');
 
 while (nrounds-- > 0) {
     console.log('round',seed);
@@ -50,7 +51,7 @@ while (nrounds-- > 0) {
     for (var step_num = 0; step_num < cycles; step_num++) {
         var ix1 = Math.floor(rng() * ary.length);
 
-        if (rng() < 0.2) {
+        if (rng() < mix) {
             var split_arg_len = ss.length(ary[ix1]);
             /* concentrate probability near the edges */
             var split_at = Math.floor(( split_arg_len + 1 ) * (Math.cbrt(2*rng()-1)+1) / 2);

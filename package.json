@@ -24,6 +24,7 @@
     "jasmine": "^2.3.1"
   },
   "dependencies": {
+    "BigInt": "^5.5.3",
     "amdefine": "^0.1.0",
     "argparser": "^0.2.2"
   }
