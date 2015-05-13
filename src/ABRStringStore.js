@@ -271,13 +271,15 @@ ABRStringStore.prototype.concat = function (x,y) {
 
 // We allow expanded runs to have a null node pointer so that run counts can be manipulated without necessarily re-interning
 ABRStringStore.prototype._segmentToRuns = function (segs) {
-    var out = [];
+    var out = [], i, j, seg_ct = segs.length;
     //console.log(segs);
-    segs.forEach(function (s) {
-        s.content.forEach(function (run_node, ix) {
+    for (i = 0; i < seg_ct; i++) {
+        var s = segs[i], scon = s.content, sconlen = scon.length, ix;
+        for (ix = 0; ix < sconlen; ix++) {
+            var run_node = scon[ix];
             out.push({ run: run_node, sig: run_node.content, repeat: run_node.repeat, start: ix === 0 });
-        });
-    });
+        }
+    }
     return out;
 };
 
@@ -338,8 +340,9 @@ ABRStringStore.prototype._runsExtractLeft = function (runs,k) {
 };
 
 ABRStringStore.prototype._runsAppendSigs = function (runs,ary) {
-    var last = runs.length ? runs[runs.length-1] : null;
-    ary.forEach(function (sig) {
+    var last = runs.length ? runs[runs.length-1] : null, alen = ary.length, ix;
+    for (ix=0; ix < alen; ix++) {
+        var sig = ary[ix];
         if (last && last.sig === sig) {
             last.repeat = bn_add1(last.repeat);
             last.run = null;
@@ -347,7 +350,7 @@ ABRStringStore.prototype._runsAppendSigs = function (runs,ary) {
         else {
             runs.push(last = { run: null, sig: sig, repeat: bn_one, start: false });
         }
-    });
+    }
     return runs;
 };
 

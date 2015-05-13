@@ -1,5 +1,5 @@
 var ABRStringStore = require('../src/ABRStringStore.js');
-var argp = require('argparser').defaults({ rounds: 1, cycles: 1000, seed: 1, limit: 1e3, constants: 5, mix: 0.2 }).nonvals('audit','baseline').parse();
+var argp = require('argparser').defaults({ rounds: 1, cycles: 1000, seed: 1, limit: 1e3, constants: 5, mix: 0.2 }).nonvals('audit','baseline','repeat').parse();
 var crypto = require('crypto');
 
 function srand(seed) {
@@ -35,7 +35,8 @@ var mix = argp.opt('mix');
 
 while (nrounds-- > 0) {
     console.log('round',seed);
-    var rng = srand(seed++);
+    var rng = srand(seed);
+    if (!argp.opt('repeat')) seed++;
     var ss = baseline ? new BaselineStore() : new ABRStringStore();
     var start = Date.now();
     var ary = [];
