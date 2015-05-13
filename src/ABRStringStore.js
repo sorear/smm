@@ -1,4 +1,4 @@
-if (typeof define !== 'function') { var define = require('amdefine')(module) }
+if (typeof define !== 'function') { var define = require('amdefine')(module) }if (typeof define !== 'function') { var define = require('amdefine')(module) }
 define([], function () {
 'use strict';
 // Implementation of the persistent string family from Alstrup, Brodal, Rauhe "Dynamic Pattern Matching", section 4 and the appendix
@@ -68,7 +68,7 @@ function ABRStringNode(store, depth, content) {
         this.code = 0;
     }
     //console.log(this);
-    //console.log(store.dump(this));
+    //console.trace('MK',store.dump(this));
 }
 
 ABRStringStore._nextSameWeight = nextSameWeight;
@@ -240,15 +240,7 @@ ABRStringStore.prototype.concat = function (x,y) {
         return me._runsToSegments(left_suf); //convert back to segments
     };
 
-    var new_roots = recurse([x],[y]);
-
-    if (new_roots.length === 1) {
-        return new_roots[0];
-    }
-    else {
-        // uprooting: also a case not mentioned in the paper
-        return me._uproot(recurse([x],[y]));
-    }
+    return me._uproot(recurse([x],[y]));
 };
 
 // We allow expanded runs to have a null node pointer so that run counts can be manipulated without necessarily re-interning
@@ -367,16 +359,19 @@ ABRStringStore.prototype._computeSegmentation = function (runs, left_fixed, righ
 
     for (i = Math.max(0,left_fixed-3); i < endix; i++) {
         codes[i+3] = runs[i].run.code;
+        //A//if (i > Math.max(0,left_fixed-3) && codes[i+3] === codes[i+2]) throw ['assert: string coloring invariant violated 1'];
     }
 
     for (i = Math.max(0,left_fixed-2); i < endix; i++) {
         var delta = codes[i+3] & ~(i === 0 ? 0 : codes[i+2]);
         pack1[i+3] = THREE_OF_SEVEN[UNPOW2[ (delta &~ (delta-1)) % 37 ]];
+        //A//if (i > Math.max(0,left_fixed-2) && pack1[i+3] === pack1[i+2]) throw ['assert: string coloring invariant violated 2'];
     }
 
     for (i = Math.max(0,left_fixed-1); i < endix; i++) {
         var delta = pack1[i+3] & ~(i === 0 ? 0 : pack1[i+2]);
         pack2[i+3] = UNPOW2[ (delta &~ (delta-1)) % 37 ];
+        //A//if (i > Math.max(0,left_fixed-1) && pack2[i+3] === pack2[i+2]) throw ['assert: string coloring invariant violated 3'];
     }
 
     // pack2 is 0-6 coded now.  hunt for local maxima
