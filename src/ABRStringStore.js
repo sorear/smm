@@ -3,6 +3,31 @@ define(['BigInt'], function (BigInt) {
 'use strict';
 // Implementation of the persistent string family from Alstrup, Brodal, Rauhe "Dynamic Pattern Matching", section 4 and the appendix
 
+var bn_zero = BigInt.int2bigInt(0,1);
+var bn_one = BigInt.int2bigInt(1,1);
+var bn_too_big = BigInt.int2bigInt(Math.pow(2,52),53);
+function bn_add(x,y) { return BigInt.add(x,y); }
+function bn_add1(x) { return BigInt.addInt(x,1); }
+function bn_equal1(x) { return BigInt.equalsInt(x,1); }
+function bn_tostr(x) { return BigInt.bigInt2str(x,10); }
+function bn_tokey(x) { return BigInt.bigInt2str(x,-1); }
+function bn_tonum(x) { var r = BigInt.greater(bn_too_big,x) ? Infinity : +bn_tostr(x); return r; }
+function bn_greaterequal(x,y) { return BigInt.greater(x,y) || BigInt.equals(x,y); }
+function bn_greater(x,y) { return BigInt.greater(x,y); }
+function bn_equal(x,y) { return BigInt.equals(x,y); }
+function bn_sub1(x) { return BigInt.sub(x,bn_one); }
+function bn_greater1(x) { return BigInt.greater(x,bn_one); }
+function bn_sub(x,y) { return BigInt.sub(x,y); }
+function bn_mul(x,y) { return BigInt.mult(x,y); }
+function bn_upgrade(x) { return typeof x === 'number' ? BigInt.int2bigInt(x,52) : x; }
+function bn_floordiv(x,y) {
+    var q = BigInt.dup(x);
+    var r = BigInt.dup(x);
+    BigInt.divide_(x,y,q,r);
+    return q;
+}
+
+
 // Enumeration of constant-weight codewords::
 // 4703 is the smallest prime where this hash table is collision-free
 var JUMP_TBL, THREE_OF_SEVEN, UNPOW2;
@@ -48,7 +73,7 @@ function ABRStringStore() {
     this._nextCode = 0x7FFF; // 16-of-31 code gives about 2^28 nodes; we run into sign bit trouble past that
 
     this.emptyString = new ABRStringNode(this, -1, null);
-    this.emptyString.length = 0;
+    this.emptyString.length = bn_zero;
 }
 
 // depth -1: Epsilon node, content is null
@@ -59,7 +84,7 @@ function ABRStringNode(store, depth, content) {
     this.depth = depth;
     this.content = content;
     this.length = null;
-    this.repeat = 0;
+    this.repeat = bn_zero;
     if (depth >= 0) {
         this.code = store._nextCode;
         if (store._nextCode == 0x7FFF0000) throw new Error('ABR Tree is full');
@@ -81,7 +106,7 @@ ABRStringStore.prototype.singleton = function (ch) {
     }
     else {
         var sng = new ABRStringNode(this, 0, ch);
-        sng.length = 1;
+        sng.length = bn_one;
         this._singletons.set(ch, sng);
         return sng;
     }
@@ -125,7 +150,7 @@ ABRStringStore.prototype.dump = function (node) {
         }
         else if (nn.depth & 1) {
             render(nn.content);
-            if (nn.repeat !== 1) out.push('(*'+nn.repeat+')'); //BIGNUM
+            if (!bn_equal1(nn.repeat)) out.push('(*'+bn_tostr(nn.repeat)+')');
         }
         else {
             out.push('[');
@@ -153,8 +178,8 @@ ABRStringStore.prototype.toArray = function (node, out, maxLen) {
         out.push(node.content);
     }
     else if (node.depth & 1) {
-        var count = node.repeat;
-        while (out.length < maxLen && count--) { //BIGNUM
+        var count = bn_tonum(node.repeat);
+        while (out.length < maxLen && count--) {
             this.toArray(node.content,out,maxLen);
         }
     }
@@ -272,6 +297,7 @@ ABRStringStore.prototype._runsToSegments = function (runs) {
         }
 
         if (!ptr.has(null)) {
+            /*A*/if (!(segment[0].depth & 1)) throw 'run must be of segments';
             ptr.set(null, new ABRStringNode(this, segment[0].depth+1, segment));
         }
         out.push(ptr.get(null));
@@ -283,8 +309,8 @@ ABRStringStore.prototype._runsExtractRight = function (runs,k) {
     var out = [];
     while (k-- && runs.length) {
         var end = runs[runs.length-1];
-        if (end.repeat > 1) {
-            end.repeat--;
+        if (bn_greater1(end.repeat)) {
+            end.repeat = bn_sub1(end.repeat);
             end.run = null;
         }
         else {
@@ -299,8 +325,8 @@ ABRStringStore.prototype._runsExtractLeft = function (runs,k) {
     var out = [];
     while (k-- && runs.length) {
         var end = runs[0];
-        if (end.repeat > 1) {
-            end.repeat--;
+        if (bn_greater1(end.repeat)) {
+            end.repeat = bn_sub1(end.repeat);
             end.run = null;
         }
         else {
@@ -315,11 +341,11 @@ ABRStringStore.prototype._runsAppendSigs = function (runs,ary) {
     var last = runs.length ? runs[runs.length-1] : null;
     ary.forEach(function (sig) {
         if (last && last.sig === sig) {
-            last.repeat++; //BIGNUM
+            last.repeat = bn_add1(last.repeat);
             last.run = null;
         }
         else {
-            runs.push(last = { run: null, sig: sig, repeat: 1, start: false });
+            runs.push(last = { run: null, sig: sig, repeat: bn_one, start: false });
         }
     });
     return runs;
@@ -337,7 +363,7 @@ ABRStringStore.prototype._runsAppendRuns = function (runs,runs2) {
     if (!runs2.length) return;
     var last = runs.length ? runs[runs.length-1] : null;
     if (last && last.sig === runs2[0].sig) {
-        last.repeat += runs2[0].repeat; //BIGNUM;
+        last.repeat = bn_add(last.repeat, runs2[0].repeat);
         last.run = null;
         runs2.shift();
     }
@@ -353,9 +379,12 @@ ABRStringStore.prototype._computeSegmentation = function (runs, left_fixed, righ
         if (runs[i].run) continue;
         var cmap = this._runs.get(runs[i].sig);
         if (!cmap) this._runs.set(runs[i].sig, cmap = new Map());
-        var rnode = cmap.get(runs[i].repeat); //BIGNUM
+        var rkey = bn_tokey(runs[i].repeat);
+        var rnode = cmap.get(rkey);
         if (!rnode) {
-            cmap.set(runs[i].repeat, rnode = new ABRStringNode(this, runs[i].sig.depth+1, runs[i].sig));
+            /*A*/if (bn_equal(runs[i].repeat,bn_zero)) throw 'zero length repeat';
+            /*A*/if (runs[i].sig.depth & 1) throw 'tried to make a run of runs';
+            cmap.set(rkey, rnode = new ABRStringNode(this, runs[i].sig.depth+1, runs[i].sig));
             rnode.repeat = runs[i].repeat;
         }
         runs[i].run = rnode;
@@ -394,7 +423,7 @@ ABRStringStore.prototype._uproot = function (roots) {
         this._computeSegmentation(roots, 0, 0); //calculate segment borders
         roots = this._runsToSegments(roots); //convert to segments
     }
-    while (roots[0].depth > 0 && roots[0].content.length === 1 && roots[0].content[0].repeat === 1) {
+    while (roots[0].depth > 0 && roots[0].content.length === 1 && bn_equal1(roots[0].content[0].repeat)) {
         roots[0] = roots[0].content[0].content;
     }
     return roots[0];
@@ -405,16 +434,17 @@ var SPLIT_R_COUNT = DELTA_L + DELTA_R + 2;
 ABRStringStore.prototype.split = function (str, ix) {
     var me = this;
     //console.log(me.dump(str),ix);
-    if (ix <= 0) return [me.emptyString, str];
-    if (ix >= me.length(str)) return [str, me.emptyString];
+    ix = bn_upgrade(ix);
+    if (bn_greaterequal(bn_zero,ix)) return [me.emptyString, str];
+    if (bn_greaterequal(ix,me.lengthBig(str))) return [str, me.emptyString];
 
     // lsigs contains only sigs that overlap or are left of the cut
     // lsigs+rsigs contains all sigs to recompute and all context
     // after expanding "L" lsigs and having an effective depth of 2L it must be able to satisfy a cut of "L+1" for the recursion and rejoining while keeping a depth of DELTA_L+DELTA_R so that all can be recomputed; the left sentinal is necessarily untouched provided DELTA_L >= 1
     var recurse = function (lsigs, rsigs, cut) {
         //console.log(lsigs.map(me.dump,me), rsigs.map(me.dump,me), cut);
-        var lsigs_len = 0;
-        lsigs.forEach(function (ls) { lsigs_len += me.length(ls); });
+        var lsigs_len = bn_zero;
+        lsigs.forEach(function (ls) { lsigs_len = bn_add(lsigs_len,me.lengthBig(ls)); });
 
         if (lsigs[0].depth === 0) return [lsigs, rsigs]; // base case
 
@@ -424,19 +454,20 @@ ABRStringStore.prototype.split = function (str, ix) {
 
         // move sigs to rsig as the cut descends
         while (true) {
-            var lsigs_last = lsigs[lsigs.length-1], lsigs_last_len = me.length(lsigs_last.sig);
-            if (lsigs_last_len > lsigs_len - cut) break;
+            var lsigs_last = lsigs[lsigs.length-1], lsigs_last_len = me.lengthBig(lsigs_last.sig);
+            var surplus = bn_sub(lsigs_len, cut);
+            if (bn_greater(lsigs_last_len, surplus)) break;
 
-            var rem = Math.floor( (lsigs_len - cut) / lsigs_last_len );
+            var rem = bn_floordiv(surplus, lsigs_last_len);
 
-            if (rem >= lsigs_last.repeat) {
+            if (bn_greaterequal(rem, lsigs_last.repeat)) {
                 lsigs.pop();
-                lsigs_len -= lsigs_last_len * lsigs_last.repeat;
+                lsigs_len = bn_sub(lsigs_len, bn_mul(lsigs_last_len, lsigs_last.repeat));
                 rsigs.unshift(lsigs_last);
             }
             else {
-                lsigs_len -= lsigs_last_len * rem;
-                lsigs_last.repeat -= rem;
+                lsigs_len = bn_sub(lsigs_len, bn_mul(lsigs_last_len, rem));
+                lsigs_last.repeat = bn_sub(lsigs_last.repeat, rem);
                 lsigs_last.run = null;
                 rsigs.unshift({ run: null, repeat: rem, sig: lsigs_last.sig, first: false });
                 break;
@@ -448,9 +479,9 @@ ABRStringStore.prototype.split = function (str, ix) {
         var right_wontchange = Math.max(0,rsigs.length - (SPLIT_R_COUNT + 1 + DELTA_L));
 
         var left_ex = me._runsExtractRight(lsigs, SPLIT_L_COUNT);
-        left_ex.forEach(function (lex) { lsigs_len -= me.length(lex); });
+        left_ex.forEach(function (lex) { lsigs_len = bn_sub(lsigs_len, me.lengthBig(lex)); });
         // de-RLE a recursion buffer on each side
-        var recursed = recurse(left_ex, me._runsExtractLeft(rsigs, SPLIT_R_COUNT), cut - lsigs_len);
+        var recursed = recurse(left_ex, me._runsExtractLeft(rsigs, SPLIT_R_COUNT), bn_sub(cut, lsigs_len));
 
         // re-RLE, recompute segmentation, return
         me._runsAppendSigs(lsigs, recursed[0]);
@@ -470,13 +501,17 @@ ABRStringStore.prototype.fromArray = function (a) {
 };
 
 ABRStringStore.prototype.length = function (nn) {
+    return bn_tonum(this.lengthBig(nn));
+};
+
+ABRStringStore.prototype.lengthBig = function (nn) {
     if (nn.length !== null) return nn.length;
     if (nn.depth & 1) {
-        return nn.length = nn.repeat * this.length(nn.content);
+        return nn.length = bn_mul(nn.repeat, this.lengthBig(nn.content));
     }
     else {
-        var len = 0;
-        nn.content.forEach(function (nn2) { len += this.length(nn2); }, this);
+        var len = bn_zero;
+        nn.content.forEach(function (nn2) { len = bn_add(len, this.lengthBig(nn2)); }, this);
         return nn.length = len;
     }
 };
