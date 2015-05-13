@@ -59,6 +59,7 @@ function ABRStringNode(store, depth, content) {
     this.depth = depth;
     this.content = content;
     this.length = null;
+    this.repeat = 0;
     if (depth >= 0) {
         this.code = store._nextCode;
         if (store._nextCode == 0x7FFF0000) throw new Error('ABR Tree is full');
@@ -100,7 +101,7 @@ ABRStringStore.prototype.dump = function (node) {
         }
         used_once.add(nn);
         if (nn.depth <= 0) return;
-        else if (nn.depth & 1) scan(nn.content[1]);
+        else if (nn.depth & 1) scan(nn.content);
         else nn.content.forEach(scan);
     };
 
@@ -123,8 +124,8 @@ ABRStringStore.prototype.dump = function (node) {
             out.push(nn.content.toString());
         }
         else if (nn.depth & 1) {
-            render(nn.content[1]);
-            if (nn.content[0] !== 1) out.push('(*'+nn.content[0]+')'); //BIGNUM
+            render(nn.content);
+            if (nn.repeat !== 1) out.push('(*'+nn.repeat+')'); //BIGNUM
         }
         else {
             out.push('[');
@@ -152,9 +153,9 @@ ABRStringStore.prototype.toArray = function (node, out, maxLen) {
         out.push(node.content);
     }
     else if (node.depth & 1) {
-        var count = node.content[0];
+        var count = node.repeat;
         while (out.length < maxLen && count--) { //BIGNUM
-            this.toArray(node.content[1],out,maxLen);
+            this.toArray(node.content,out,maxLen);
         }
     }
     else {
@@ -249,7 +250,7 @@ ABRStringStore.prototype._segmentToRuns = function (segs) {
     //console.log(segs);
     segs.forEach(function (s) {
         s.content.forEach(function (run_node, ix) {
-            out.push({ run: run_node, sig: run_node.content[1], repeat: run_node.content[0], start: ix === 0 });
+            out.push({ run: run_node, sig: run_node.content, repeat: run_node.repeat, start: ix === 0 });
         });
     });
     return out;
@@ -353,7 +354,10 @@ ABRStringStore.prototype._computeSegmentation = function (runs, left_fixed, righ
         var cmap = this._runs.get(runs[i].sig);
         if (!cmap) this._runs.set(runs[i].sig, cmap = new Map());
         var rnode = cmap.get(runs[i].repeat); //BIGNUM
-        if (!rnode) cmap.set(runs[i].repeat, rnode = new ABRStringNode(this, runs[i].sig.depth+1, [runs[i].repeat, runs[i].sig]));
+        if (!rnode) {
+            cmap.set(runs[i].repeat, rnode = new ABRStringNode(this, runs[i].sig.depth+1, runs[i].sig));
+            rnode.repeat = runs[i].repeat;
+        }
         runs[i].run = rnode;
     }
 
@@ -390,8 +394,8 @@ ABRStringStore.prototype._uproot = function (roots) {
         this._computeSegmentation(roots, 0, 0); //calculate segment borders
         roots = this._runsToSegments(roots); //convert to segments
     }
-    while (roots[0].depth > 0 && roots[0].content.length === 1 && roots[0].content[0].content[0] === 1) {
-        roots[0] = roots[0].content[0].content[1];
+    while (roots[0].depth > 0 && roots[0].content.length === 1 && roots[0].content[0].repeat === 1) {
+        roots[0] = roots[0].content[0].content;
     }
     return roots[0];
 };
@@ -468,7 +472,7 @@ ABRStringStore.prototype.fromArray = function (a) {
 ABRStringStore.prototype.length = function (nn) {
     if (nn.length !== null) return nn.length;
     if (nn.depth & 1) {
-        return nn.length = nn.content[0] * this.length(nn.content[1]);
+        return nn.length = nn.repeat * this.length(nn.content);
     }
     else {
         var len = 0;
