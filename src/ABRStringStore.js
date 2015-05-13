@@ -68,7 +68,7 @@ function ABRStringStore() {
     JUMP_TBL || calcJumpTbl();
     // allocate storage for cons table
     this._singletons = new Map();
-    this._blocks = new Map();
+    this._blocks = {};
     this._runs = new Map();
     this._nextCode = 0x7FFF; // 16-of-31 code gives about 2^28 nodes; we run into sign bit trouble past that
 
@@ -308,19 +308,17 @@ ABRStringStore.prototype._runsToSegments = function (runs) {
         }
 
         var segment = [];
+        var hkey = '';
         var first = ix;
-        var ptr = this._blocks;
         while (ix < runs.length && (ix === first || !runs[ix].start)) {
-            var run = runs[ix++];
-            segment.push(run.run);
-            if (!ptr.has(run.run)) ptr.set(run.run, new Map()); // grossly inefficient
-            ptr = ptr.get(run.run);
+            var run = runs[ix++].run;
+            segment.push(run);
+            hkey = hkey + ':' + run.code;
         }
-
-        if (!ptr.has(null)) {
-            ptr.set(null, new ABRStringNode(this, (segment[0].depth|1)+1, segment));
-        }
-        out.push(ptr.get(null));
+        var ptr = this._blocks;
+        fastseg = ptr[hkey];
+        if (!fastseg) ptr[hkey] = fastseg = new ABRStringNode(this, (segment[0].depth|1)+1, segment);
+        out.push(fastseg);
     }
     return out;
 };
