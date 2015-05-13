@@ -405,7 +405,7 @@ ABRStringStore.prototype._computeSegmentation = function (runs, left_fixed, righ
     for (i = left_fixed; i < rlen - right_fixed; i++) {
         runs[i].segm = null;
         if (runs[i].run) continue;
-        if (bn_equal1(runs[i].repeat)) { runs[i].run = runs[i].sig; continue; }
+        if (runs[i].repeat === bn_one || bn_equal1(runs[i].repeat)) { runs[i].run = runs[i].sig; continue; }
         var cmap = this._runs.get(runs[i].sig);
         if (!cmap) this._runs.set(runs[i].sig, cmap = new Map());
         var rkey = bn_tokey(runs[i].repeat);
