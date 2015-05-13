@@ -1,5 +1,4 @@
-var requirejs = require('requirejs').config({ nodeRequire: require, baseUrl: require('path').resolve(__dirname, '../src') });
-var ABRStringStore = requirejs('ABRStringStore');
+var ABRStringStore = require('../src/ABRStringStore.js');
 
 describe('The constant-weight iteration', function () {
     it('takes 1 to 2', function() { expect(ABRStringStore._nextSameWeight(1)).toBe(2); });

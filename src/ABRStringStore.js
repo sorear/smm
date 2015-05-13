@@ -1,4 +1,5 @@
-define(['./BigNat'], function (BigNat) {
+if (typeof define !== 'function') { var define = require('amdefine')(module) }
+define([], function () {
 'use strict';
 // Implementation of the persistent string family from Alstrup, Brodal, Rauhe "Dynamic Pattern Matching", section 4 and the appendix
 

@@ -24,6 +24,6 @@
     "jasmine": "^2.3.1"
   },
   "dependencies": {
-    "requirejs": "^2.1.17"
+    "amdefine": "^0.1.0"
   }
 }
