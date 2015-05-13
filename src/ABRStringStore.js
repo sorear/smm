@@ -269,6 +269,14 @@ ABRStringStore.prototype.concat = function (x,y) {
     return me._uproot(recurse([x],[y]));
 };
 
+function ABRUnpackedRun(run, sig, repeat, start, segm) {
+    this.run = run;
+    this.sig = sig;
+    this.repeat = repeat;
+    this.start = start;
+    this.segm = segm;
+}
+
 // We allow expanded runs to have a null node pointer so that run counts can be manipulated without necessarily re-interning
 ABRStringStore.prototype._segmentToRuns = function (segs) {
     var out = [], i, j, seg_ct = segs.length;
@@ -278,10 +286,10 @@ ABRStringStore.prototype._segmentToRuns = function (segs) {
         for (ix = 0; ix < sconlen; ix++) {
             var run_node = scon[ix];
             if (run_node.depth & 1) {
-                out.push({ run: run_node, sig: run_node.content, repeat: run_node.repeat, start: ix === 0, segm: s });
+                out.push(new ABRUnpackedRun(run_node, run_node.content, run_node.repeat, ix === 0, s));
             }
             else {
-                out.push({ run: run_node, sig: run_node, repeat: bn_one, start: ix === 0, segm: s });
+                out.push(new ABRUnpackedRun(run_node, run_node, bn_one, ix === 0, s));
             }
         }
     }
@@ -364,7 +372,7 @@ ABRStringStore.prototype._runsAppendSigs = function (runs,ary) {
             last.run = null;
         }
         else {
-            runs.push(last = { run: null, sig: sig, repeat: bn_one, start: false, segm: null });
+            runs.push(last = new ABRUnpackedRun(null, sig, bn_one, false, null));
         }
     }
     return runs;
@@ -490,7 +498,7 @@ ABRStringStore.prototype.split = function (str, ix) {
                 lsigs_len = bn_sub(lsigs_len, bn_mul(lsigs_last_len, rem));
                 lsigs_last.repeat = bn_sub(lsigs_last.repeat, rem);
                 lsigs_last.run = null;
-                rsigs.unshift({ run: null, repeat: rem, sig: lsigs_last.sig, first: false, segm: null });
+                rsigs.unshift(new ABRUnpackedRun(null, lsigs_last.sig, rem, false, null));
                 break;
             }
         }
