@@ -277,7 +277,7 @@ ABRStringStore.prototype._segmentToRuns = function (segs) {
         var s = segs[i], scon = s.content, sconlen = scon.length, ix;
         for (ix = 0; ix < sconlen; ix++) {
             var run_node = scon[ix];
-            out.push({ run: run_node, sig: run_node.content, repeat: run_node.repeat, start: ix === 0 });
+            out.push({ run: run_node, sig: run_node.content, repeat: run_node.repeat, start: ix === 0, segm: s });
         }
     }
     return out;
@@ -288,6 +288,20 @@ ABRStringStore.prototype._runsToSegments = function (runs) {
     var out = [];
     var ix = 0;
     while (ix < runs.length) {
+        var fastseg = runs[ix].segm;
+        var ix2 = ix;
+        while (ix2 < runs.length && (ix2 === ix || !runs[ix2].start)) {
+            if (!runs[ix2++].segm) {
+                fastseg = null;
+                break;
+            }
+        }
+        if (fastseg) {
+            out.push(fastseg);
+            ix = ix2;
+            continue;
+        }
+
         var segment = [];
         var first = ix;
         var ptr = this._blocks;
@@ -348,7 +362,7 @@ ABRStringStore.prototype._runsAppendSigs = function (runs,ary) {
             last.run = null;
         }
         else {
-            runs.push(last = { run: null, sig: sig, repeat: bn_one, start: false });
+            runs.push(last = { run: null, sig: sig, repeat: bn_one, start: false, segm: null });
         }
     }
     return runs;
@@ -379,6 +393,7 @@ ABRStringStore.prototype._computeSegmentation = function (runs, left_fixed, righ
 
     // lazily create the run nodes
     for (i = left_fixed; i < rlen - right_fixed; i++) {
+        runs[i].segm = null;
         if (runs[i].run) continue;
         var cmap = this._runs.get(runs[i].sig);
         if (!cmap) this._runs.set(runs[i].sig, cmap = new Map());
@@ -472,7 +487,7 @@ ABRStringStore.prototype.split = function (str, ix) {
                 lsigs_len = bn_sub(lsigs_len, bn_mul(lsigs_last_len, rem));
                 lsigs_last.repeat = bn_sub(lsigs_last.repeat, rem);
                 lsigs_last.run = null;
-                rsigs.unshift({ run: null, repeat: rem, sig: lsigs_last.sig, first: false });
+                rsigs.unshift({ run: null, repeat: rem, sig: lsigs_last.sig, first: false, segm: null });
                 break;
             }
         }
