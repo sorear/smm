@@ -204,70 +204,68 @@ ABRStringStore.prototype.concat = function (x,y) {
     // empty string cases
     if (x.depth < 0) return y;
     if (y.depth < 0) return x;
-    var me = this;
-
-    // left_suf contains the last K_L signatures at depth i, or the single
-    // signature at a depth below that.  likewise right_pref for first K_R.
-    // returns a vector of depth i signatures representing the concatenation.
-    // may destroy left_suf, right_suf.
-    var recurse = function (left_suf, right_pref) {
-        var left_depth = left_suf[0].depth, right_depth = right_pref[0].depth;
-        var max_depth = Math.max(left_depth, right_depth);
-
-        if (max_depth === 0) {
-            // trivial case
-            return left_suf.concat(right_pref);
-        }
-
-        // otherwise we need to partially expand one or both, recurse, and
-        // recombine.  the recursive call needs K_L depth i-1 signatures from
-        // the left side, so (if the left side has depth greater than i-1), we
-        // expand our signatures into 2-14 K_L runs, then pull K_L signatures
-        // off the right.  this modifies up to K_L+1 runs and thus potentially
-        // changes segment flags back to K_L+1+DELTA_R, and doing the
-        // recalculation requires K_L+1+DELTA_R+DELTA_L runs to be visible.  To
-        // ensure this, and expand one additional segment to guarantee a
-        // segment-begin run, we must expand >=1+ceil((K_L+1+D_R+D_L)/2)
-        // (relaxed to >= 1 + (K_L+2+D_R+D_L)/2) segments; this constrains
-        // 2*K_L >= 2 + K_L + D_R + D_L, so we set K_L = 2+D_R+D_L.
-        //
-        // by symmetry set K_R.
-
-        var left_recurse_buffer, right_recurse_buffer;
-        var left_wontchange, right_wontchange;
-
-        if (left_depth === max_depth) {
-            left_suf = me._segmentToRuns(left_suf); //explode segments in left_suf into tagged runs
-            left_wontchange = Math.max(0,left_suf.length - (CONCAT_WINDOW + 1 + DELTA_R)); //mark rightmost CONCAT_WINDOW+1+DELTA_R (the could-change region, incl. retagging)
-            left_recurse_buffer = me._runsExtractRight(left_suf, CONCAT_WINDOW); //extract CONCAT_WINDOW right-side depth i-1 signatures
-        }
-        else {
-            left_recurse_buffer = left_suf;
-            left_wontchange = 0;
-            left_suf = [];
-        }
-
-        if (right_depth === max_depth) {
-            right_pref = me._segmentToRuns(right_pref);
-            right_wontchange = Math.max(0,right_pref.length - (CONCAT_WINDOW + 1 + DELTA_L));
-            right_recurse_buffer = me._runsExtractLeft(right_pref, CONCAT_WINDOW);
-        }
-        else {
-            right_recurse_buffer = right_pref;
-            right_wontchange = 0;
-            right_pref = [];
-        }
-
-        var recurse_out = recurse(left_recurse_buffer, right_recurse_buffer);
-
-        me._runsAppendSigs(left_suf, recurse_out); //convert recurse_out into runs, append to left_suf
-        me._runsAppendRuns(left_suf, right_pref); //merge runs from right_pref
-        me._computeSegmentation(left_suf, left_wontchange, right_wontchange); //recompute all segmentation symbols betweeen left_wontchange and right_wontchange
-        return me._runsToSegments(left_suf); //convert back to segments
-    };
-
-    return me._uproot(recurse([x],[y]));
+    return this._uproot(concatRecurse(this,[x],[y]));
 };
+
+// left_suf contains the last K_L signatures at depth i, or the single
+// signature at a depth below that.  likewise right_pref for first K_R.
+// returns a vector of depth i signatures representing the concatenation.
+// may destroy left_suf, right_suf.
+function concatRecurse(me, left_suf, right_pref) {
+    var left_depth = left_suf[0].depth, right_depth = right_pref[0].depth;
+    var max_depth = Math.max(left_depth, right_depth);
+
+    if (max_depth === 0) {
+        // trivial case
+        return left_suf.concat(right_pref);
+    }
+
+    // otherwise we need to partially expand one or both, recurse, and
+    // recombine.  the recursive call needs K_L depth i-1 signatures from
+    // the left side, so (if the left side has depth greater than i-1), we
+    // expand our signatures into 2-14 K_L runs, then pull K_L signatures
+    // off the right.  this modifies up to K_L+1 runs and thus potentially
+    // changes segment flags back to K_L+1+DELTA_R, and doing the
+    // recalculation requires K_L+1+DELTA_R+DELTA_L runs to be visible.  To
+    // ensure this, and expand one additional segment to guarantee a
+    // segment-begin run, we must expand >=1+ceil((K_L+1+D_R+D_L)/2)
+    // (relaxed to >= 1 + (K_L+2+D_R+D_L)/2) segments; this constrains
+    // 2*K_L >= 2 + K_L + D_R + D_L, so we set K_L = 2+D_R+D_L.
+    //
+    // by symmetry set K_R.
+
+    var left_recurse_buffer, right_recurse_buffer;
+    var left_wontchange, right_wontchange;
+
+    if (left_depth === max_depth) {
+        left_suf = _segmentToRuns(left_suf); //explode segments in left_suf into tagged runs
+        left_wontchange = Math.max(0,left_suf.length - (CONCAT_WINDOW + 1 + DELTA_R)); //mark rightmost CONCAT_WINDOW+1+DELTA_R (the could-change region, incl. retagging)
+        left_recurse_buffer = me._runsExtractRight(left_suf, CONCAT_WINDOW); //extract CONCAT_WINDOW right-side depth i-1 signatures
+    }
+    else {
+        left_recurse_buffer = left_suf;
+        left_wontchange = 0;
+        left_suf = [];
+    }
+
+    if (right_depth === max_depth) {
+        right_pref = _segmentToRuns(right_pref);
+        right_wontchange = Math.max(0,right_pref.length - (CONCAT_WINDOW + 1 + DELTA_L));
+        right_recurse_buffer = me._runsExtractLeft(right_pref, CONCAT_WINDOW);
+    }
+    else {
+        right_recurse_buffer = right_pref;
+        right_wontchange = 0;
+        right_pref = [];
+    }
+
+    var recurse_out = concatRecurse(me, left_recurse_buffer, right_recurse_buffer);
+
+    me._runsAppendSigs(left_suf, recurse_out); //convert recurse_out into runs, append to left_suf
+    me._runsAppendRuns(left_suf, right_pref); //merge runs from right_pref
+    me._computeSegmentation(left_suf, left_wontchange, right_wontchange); //recompute all segmentation symbols betweeen left_wontchange and right_wontchange
+    return _runsToSegments(me, left_suf); //convert back to segments
+}
 
 function ABRUnpackedRun(run, sig, repeat, start, segm) {
     this.run = run;
@@ -278,7 +276,7 @@ function ABRUnpackedRun(run, sig, repeat, start, segm) {
 }
 
 // We allow expanded runs to have a null node pointer so that run counts can be manipulated without necessarily re-interning
-ABRStringStore.prototype._segmentToRuns = function (segs) {
+function _segmentToRuns(segs) {
     var out = [], i, j, seg_ct = segs.length;
     //console.log(segs);
     for (i = 0; i < seg_ct; i++) {
@@ -297,7 +295,7 @@ ABRStringStore.prototype._segmentToRuns = function (segs) {
 };
 
 //destroys argument
-ABRStringStore.prototype._runsToSegments = function (runs) {
+function _runsToSegments(me, runs) {
     var out = [];
     var ix = 0;
     while (ix < runs.length) {
@@ -323,13 +321,13 @@ ABRStringStore.prototype._runsToSegments = function (runs) {
             segment.push(run);
             hkey = hkey + ':' + run.code;
         }
-        var ptr = this._blocks;
+        var ptr = me._blocks;
         fastseg = ptr[hkey];
-        if (!fastseg) ptr[hkey] = fastseg = new ABRStringNode(this, (segment[0].depth|1)+1, segment);
+        if (!fastseg) ptr[hkey] = fastseg = new ABRStringNode(me, (segment[0].depth|1)+1, segment);
         out.push(fastseg);
     }
     return out;
-};
+}
 
 ABRStringStore.prototype._runsExtractRight = function (runs,k) {
     var out = [];
@@ -450,7 +448,7 @@ ABRStringStore.prototype._uproot = function (roots) {
         // else we need to increase depth here.
         roots = this._runsAppendSigs([], roots); //convert to runs
         this._computeSegmentation(roots, 0, 0); //calculate segment borders
-        roots = this._runsToSegments(roots); //convert to segments
+        roots = _runsToSegments(this,roots); //convert to segments
     }
     while (roots[0].depth > 0 && roots[0].content.length === 1 && !(roots[0].content[0].depth & 1)) {
         roots[0] = roots[0].content[0];
@@ -461,68 +459,67 @@ ABRStringStore.prototype._uproot = function (roots) {
 var SPLIT_L_COUNT = DELTA_L + DELTA_R + 1;
 var SPLIT_R_COUNT = DELTA_L + DELTA_R + 2;
 ABRStringStore.prototype.split = function (str, ix) {
-    var me = this;
     //console.log(me.dump(str),ix);
     ix = bn_upgrade(ix);
-    if (bn_greaterequal(bn_zero,ix)) return [me.emptyString, str];
-    if (bn_greaterequal(ix,me.lengthBig(str))) return [str, me.emptyString];
+    if (bn_greaterequal(bn_zero,ix)) return [this.emptyString, str];
+    if (bn_greaterequal(ix,this.lengthBig(str))) return [str, this.emptyString];
 
-    // lsigs contains only sigs that overlap or are left of the cut
-    // lsigs+rsigs contains all sigs to recompute and all context
-    // after expanding "L" lsigs and having an effective depth of 2L it must be able to satisfy a cut of "L+1" for the recursion and rejoining while keeping a depth of DELTA_L+DELTA_R so that all can be recomputed; the left sentinal is necessarily untouched provided DELTA_L >= 1
-    var recurse = function (lsigs, rsigs, cut) {
-        //console.log(lsigs.map(me.dump,me), rsigs.map(me.dump,me), cut);
-        var lsigs_len = bn_zero;
-        lsigs.forEach(function (ls) { lsigs_len = bn_add(lsigs_len,me.lengthBig(ls)); });
-
-        if (lsigs[0].depth === 0) return [lsigs, rsigs]; // base case
-
-        // explode lsig and rsig to sigpowers
-        lsigs = me._segmentToRuns(lsigs);
-        rsigs = me._segmentToRuns(rsigs);
-
-        // move sigs to rsig as the cut descends
-        while (true) {
-            var lsigs_last = lsigs[lsigs.length-1], lsigs_last_len = me.lengthBig(lsigs_last.sig);
-            var surplus = bn_sub(lsigs_len, cut);
-            if (bn_greater(lsigs_last_len, surplus)) break;
-
-            var rem = bn_floordiv(surplus, lsigs_last_len);
-
-            if (bn_greaterequal(rem, lsigs_last.repeat)) {
-                lsigs.pop();
-                lsigs_len = bn_sub(lsigs_len, bn_mul(lsigs_last_len, lsigs_last.repeat));
-                rsigs.unshift(lsigs_last);
-            }
-            else {
-                lsigs_len = bn_sub(lsigs_len, bn_mul(lsigs_last_len, rem));
-                lsigs_last.repeat = bn_sub(lsigs_last.repeat, rem);
-                lsigs_last.run = null;
-                rsigs.unshift(new ABRUnpackedRun(null, lsigs_last.sig, rem, false, null));
-                break;
-            }
-        }
-
-        // mark will-not-be-modified region on each side; note, there may be 1 dirty entry on each side already
-        var left_wontchange = Math.max(0,lsigs.length - (SPLIT_L_COUNT + 1 + DELTA_R));
-        var right_wontchange = Math.max(0,rsigs.length - (SPLIT_R_COUNT + 1 + DELTA_L));
-
-        var left_ex = me._runsExtractRight(lsigs, SPLIT_L_COUNT);
-        left_ex.forEach(function (lex) { lsigs_len = bn_sub(lsigs_len, me.lengthBig(lex)); });
-        // de-RLE a recursion buffer on each side
-        var recursed = recurse(left_ex, me._runsExtractLeft(rsigs, SPLIT_R_COUNT), bn_sub(cut, lsigs_len));
-
-        // re-RLE, recompute segmentation, return
-        me._runsAppendSigs(lsigs, recursed[0]);
-        me._runsPrependSigs(rsigs, recursed[1]);
-        me._computeSegmentation(lsigs, left_wontchange, 0);
-        me._computeSegmentation(rsigs, 0, right_wontchange);
-        return [me._runsToSegments(lsigs), me._runsToSegments(rsigs)];
-    };
-
-    var r_out = recurse([str],[],ix);
-    return [ me._uproot(r_out[0]), me._uproot(r_out[1]) ];
+    var r_out = splitRecurse(this,[str],[],ix);
+    return [ this._uproot(r_out[0]), this._uproot(r_out[1]) ];
 };
+
+// lsigs contains only sigs that overlap or are left of the cut
+// lsigs+rsigs contains all sigs to recompute and all context
+// after expanding "L" lsigs and having an effective depth of 2L it must be able to satisfy a cut of "L+1" for the recursion and rejoining while keeping a depth of DELTA_L+DELTA_R so that all can be recomputed; the left sentinal is necessarily untouched provided DELTA_L >= 1
+function splitRecurse(me,lsigs, rsigs, cut) {
+    //console.log(lsigs.map(me.dump,me), rsigs.map(me.dump,me), cut);
+    var lsigs_len = bn_zero;
+    lsigs.forEach(function (ls) { lsigs_len = bn_add(lsigs_len,me.lengthBig(ls)); });
+
+    if (lsigs[0].depth === 0) return [lsigs, rsigs]; // base case
+
+    // explode lsig and rsig to sigpowers
+    lsigs = _segmentToRuns(lsigs);
+    rsigs = _segmentToRuns(rsigs);
+
+    // move sigs to rsig as the cut descends
+    while (true) {
+        var lsigs_last = lsigs[lsigs.length-1], lsigs_last_len = me.lengthBig(lsigs_last.sig);
+        var surplus = bn_sub(lsigs_len, cut);
+        if (bn_greater(lsigs_last_len, surplus)) break;
+
+        var rem = bn_floordiv(surplus, lsigs_last_len);
+
+        if (bn_greaterequal(rem, lsigs_last.repeat)) {
+            lsigs.pop();
+            lsigs_len = bn_sub(lsigs_len, bn_mul(lsigs_last_len, lsigs_last.repeat));
+            rsigs.unshift(lsigs_last);
+        }
+        else {
+            lsigs_len = bn_sub(lsigs_len, bn_mul(lsigs_last_len, rem));
+            lsigs_last.repeat = bn_sub(lsigs_last.repeat, rem);
+            lsigs_last.run = null;
+            rsigs.unshift(new ABRUnpackedRun(null, lsigs_last.sig, rem, false, null));
+            break;
+        }
+    }
+
+    // mark will-not-be-modified region on each side; note, there may be 1 dirty entry on each side already
+    var left_wontchange = Math.max(0,lsigs.length - (SPLIT_L_COUNT + 1 + DELTA_R));
+    var right_wontchange = Math.max(0,rsigs.length - (SPLIT_R_COUNT + 1 + DELTA_L));
+
+    var left_ex = me._runsExtractRight(lsigs, SPLIT_L_COUNT);
+    left_ex.forEach(function (lex) { lsigs_len = bn_sub(lsigs_len, me.lengthBig(lex)); });
+    // de-RLE a recursion buffer on each side
+    var recursed = splitRecurse(me,left_ex, me._runsExtractLeft(rsigs, SPLIT_R_COUNT), bn_sub(cut, lsigs_len));
+
+    // re-RLE, recompute segmentation, return
+    me._runsAppendSigs(lsigs, recursed[0]);
+    me._runsPrependSigs(rsigs, recursed[1]);
+    me._computeSegmentation(lsigs, left_wontchange, 0);
+    me._computeSegmentation(rsigs, 0, right_wontchange);
+    return [_runsToSegments(me,lsigs), _runsToSegments(me,rsigs)];
+}
 
 ABRStringStore.prototype.fromArray = function (a) {
     if (!a.length) return this.emptyString;
