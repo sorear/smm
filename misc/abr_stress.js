@@ -1,5 +1,5 @@
 var ABRStringStore = require('../src/ABRStringStore.js');
-var argp = require('argparser').defaults({ rounds: 1, cycles: 1000, seed: 1, limit: 1e3, constants: 5, mix: 0.2 }).nonvals('audit','baseline','repeat').parse();
+var argp = require('argparser').defaults({ rounds: 1, cycles: 1000, seed: 1, limit: 1e3, constants: 5, mix: 0.2, lcp_mix: 0 }).nonvals('audit','baseline','repeat').parse();
 var crypto = require('crypto');
 
 function srand(seed) {
@@ -32,6 +32,7 @@ var limit = argp.opt('limit');
 var audit = argp.opt('audit');
 var baseline = argp.opt('baseline');
 var mix = argp.opt('mix');
+var lcp_mix = argp.opt('lcp_mix');
 
 while (nrounds-- > 0) {
     console.log('round',seed);
@@ -52,7 +53,52 @@ while (nrounds-- > 0) {
     for (var step_num = 0; step_num < cycles; step_num++) {
         var ix1 = Math.floor(rng() * ary.length);
 
-        if (rng() < mix) {
+        if (lcp_mix && rng() < lcp_mix) {
+            var ix2 = Math.floor(rng() * ary.length);
+
+            var lcp = ss.lcpBig(ary[ix1],ary[ix2]);
+            var compare = ss.compare(ary[ix1],ary[ix2]);
+            var lcs = ss.lcsBig(ary[ix1],ary[ix2]);
+
+            //var tostr = ABRStringStore.BigInt.bigInt2str;
+            //console.log(tostr(lcp,10),tostr(lcs,10),ss.toArray(ary[ix1]).join(''),ss.toArray(ary[ix2]).join(''),compare);
+            // make sure the common prefixes and suffixes are common
+            if (ABRStringStore.BigInt.greater(lcp, ss.lengthBig(ary[ix1]))) throw 'lcp longer than A';
+            if (ABRStringStore.BigInt.greater(lcs, ss.lengthBig(ary[ix1]))) throw 'lcs longer than A';
+            if (ABRStringStore.BigInt.greater(lcp, ss.lengthBig(ary[ix2]))) throw 'lcp longer than B';
+            if (ABRStringStore.BigInt.greater(lcs, ss.lengthBig(ary[ix2]))) throw 'lcs longer than B';
+            var sres1 = ss.split(ary[ix1],lcp);
+            var sres2 = ss.split(ary[ix2],lcp);
+            var sres3 = ss.split(ary[ix1],ABRStringStore.BigInt.sub(ss.lengthBig(ary[ix1]),lcs));
+            var sres4 = ss.split(ary[ix2],ABRStringStore.BigInt.sub(ss.lengthBig(ary[ix2]),lcs));
+            if (sres1[0] !== sres2[0]) throw 'lcp not a common prefix';
+            if (sres3[1] !== sres4[1]) throw 'lcs not a common suffix';
+
+            // make sure they are maximal and that the differing part agrees with the comparison
+            var lcpnext1 = ss.split(sres1[1],1)[0];
+            var lcpnext2 = ss.split(sres2[1],1)[0];
+            var ONE = ABRStringStore.BigInt.int2bigInt(1,1);
+            var lcsnext1 = ss.split(sres3[0],ABRStringStore.BigInt.sub(ss.lengthBig(sres3[0]),ONE))[1];
+            var lcsnext2 = ss.split(sres4[0],ABRStringStore.BigInt.sub(ss.lengthBig(sres4[0]),ONE))[1];
+
+            if (lcpnext1 !== ss.emptyString && lcpnext1 === lcpnext2) throw 'lcp not maximal';
+            if (lcsnext1 !== ss.emptyString && lcsnext1 === lcsnext2) throw 'lcs not maximal';
+            if (compare === 0) {
+                if (lcpnext1 !== ss.emptyString) throw 'equality but common proper prefix';
+            }
+            else if (compare > 0) {
+                if (lcpnext1 === ss.emptyString) throw '"" should not be greater than anything';
+                if (lcpnext2 !== ss.emptyString && ss.toArray(lcpnext1)[0] <= ss.toArray(lcpnext2)[0]) throw 'string is greater, but elements disagree';
+            }
+            else if (compare < 0) {
+                if (lcpnext2 === ss.emptyString) throw '"" should not be greater than anything';
+                if (lcpnext1 !== ss.emptyString && ss.toArray(lcpnext1)[0] >= ss.toArray(lcpnext2)[0]) throw 'string is less, but elements disagree';
+            }
+            else {
+                throw 'compare is NaN?';
+            }
+        }
+        else if (rng() < mix) {
             var split_arg_len = ss.length(ary[ix1]);
             /* concentrate probability near the edges */
             var split_at = Math.floor(( split_arg_len + 1 ) * (Math.cbrt(2*rng()-1)+1) / 2);

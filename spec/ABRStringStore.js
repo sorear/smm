@@ -93,6 +93,49 @@ describe('The string store object', function () {
         it('split and rejoin structured sequence', function () { var t = thue(24); expect(ss.concat.apply(ss,ss.split(t,1000000))).toBe(t); });
     });
 
+    describe('takes longest common prefix', function () {
+        it('of "" and "" to 0', function () { expect(ss.lcp(ss.emptyString, ss.emptyString)).toBe(0); });
+        it('of "" and anything else to 0', function () { expect(ss.lcp(ss.emptyString, ss.singleton(5))).toBe(0); });
+        it('of anything and "" to 0', function () { expect(ss.lcp(ss.singleton(5), ss.emptyString)).toBe(0); });
+        it('of two equal singletons to 1', function () { expect(ss.lcp(ss.singleton(5), ss.singleton(5))).toBe(1); });
+        it('of two unequal singletons to 0', function () { expect(ss.lcp(ss.singleton(5), ss.singleton(4))).toBe(0); });
+        it('of two equal repetitive strings', function () { expect(ss.lcp(ss.fromArray(range(1,10,1)), ss.fromArray(range(1,10,1)))).toBe(10); });
+        it('of two equal nonrepetitive strings', function () { expect(ss.lcp(ss.fromArray(range(1,10)), ss.fromArray(range(1,10)))).toBe(10); });
+        it('of two related nonrepetitive strings', function () { expect(ss.lcp(ss.fromArray(range(1,20)), ss.fromArray(range(1,10)))).toBe(10); });
+        it('of two related repetitive strings', function () { expect(ss.lcp(ss.fromArray(range(1,20,1)), ss.fromArray(range(1,10,1)))).toBe(10); });
+        it('of two related structured strings', function () { expect(ss.lcp(thue(20), thue(21))).toBe(Math.pow(2,20)); });
+        it('of two structured strings with different prefixes', function () { expect(ss.lcp(ss.concat(ss.singleton(2),thue(20)), ss.concat(ss.singleton(3),thue(20)))).toBe(0); });
+        it('of two structured strings with different suffixes', function () { expect(ss.lcp(ss.concat(thue(20),ss.singleton(2)), ss.concat(thue(20),ss.singleton(3)))).toBe(Math.pow(2,20)); });
+    });
+
+    describe('compares', function () {
+        it('"" and "" equal', function () { expect(ss.compare(ss.emptyString, ss.emptyString)).toBe(0); });
+        it('"" less than anything else', function () { expect(ss.compare(ss.emptyString, ss.singleton(5))).toBe(-1); });
+        it('anything else greater than ""', function () { expect(ss.compare(ss.singleton(5), ss.emptyString)).toBe(1); });
+        it('two equal singletons equal', function () { expect(ss.compare(ss.singleton(5), ss.singleton(5))).toBe(0); });
+        it('two equal singletons equal (by equality function)', function () { expect(ss.equal(ss.singleton(5), ss.singleton(5))).toBe(true); });
+        it('two unequal singletons by default comparison', function () { expect(ss.compare(ss.singleton(5), ss.singleton(6))).toBe(-1); });
+        it('two unequal singletons by default comparison', function () { expect(ss.compare(ss.singleton(6), ss.singleton(5))).toBe(1); });
+        it('two unequal singletons by overridden comparison', function () { ss.singletonComparer = function (a,b) { return b-a; }; expect(ss.compare(ss.singleton(6), ss.singleton(5))).toBe(-1); });
+        it('two unequal singletons unequal (by equality function)', function () { expect(ss.equal(ss.singleton(6), ss.singleton(5))).toBe(false); });
+        it('two structured strings with different suffixes by suffix', function () { expect(ss.compare(ss.concat(thue(20),ss.singleton(2)), ss.concat(thue(20),ss.singleton(3)))).toBe(-1); });
+    });
+
+    describe('takes longest common suffix', function () {
+        it('of "" and "" to 0', function () { expect(ss.lcs(ss.emptyString, ss.emptyString)).toBe(0); });
+        it('of "" and anything else to 0', function () { expect(ss.lcs(ss.emptyString, ss.singleton(5))).toBe(0); });
+        it('of anything and "" to 0', function () { expect(ss.lcs(ss.singleton(5), ss.emptyString)).toBe(0); });
+        it('of two equal singletons to 1', function () { expect(ss.lcs(ss.singleton(5), ss.singleton(5))).toBe(1); });
+        it('of two unequal singletons to 0', function () { expect(ss.lcs(ss.singleton(5), ss.singleton(4))).toBe(0); });
+        it('of two equal repetitive strings', function () { expect(ss.lcs(ss.fromArray(range(1,10,1)), ss.fromArray(range(1,10,1)))).toBe(10); });
+        it('of two equal nonrepetitive strings', function () { expect(ss.lcs(ss.fromArray(range(1,10)), ss.fromArray(range(1,10)))).toBe(10); });
+        it('of two related nonrepetitive strings', function () { expect(ss.lcs(ss.concat(ss.fromArray(range(11,20)),ss.fromArray(range(1,10))), ss.fromArray(range(1,10)))).toBe(10); });
+        it('of two related repetitive strings', function () { expect(ss.lcs(ss.fromArray(range(1,20,1)), ss.fromArray(range(1,10,1)))).toBe(10); });
+        it('of two related structured strings', function () { expect(ss.lcs(thue(20), thue(22))).toBe(Math.pow(2,20)); });
+        it('of two structured strings with different prefixes', function () { expect(ss.lcs(ss.concat(ss.singleton(2),thue(20)), ss.concat(ss.singleton(3),thue(20)))).toBe(Math.pow(2,20)); });
+    });
+
+
     //new ABRStringStore().fromArray([1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20]);
     //new ABRStringStore().fromArray([1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20]);
     //new ABRStringStore().fromArray([1,2,3,4,5,5,5,8,9,10]);

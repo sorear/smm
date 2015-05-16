@@ -74,6 +74,8 @@ function ABRStringStore() {
 
     this.emptyString = new ABRStringNode(this, -1, null);
     this.emptyString.length = bn_zero;
+
+    this.singletonComparer = function (a,b) { return a<b ? -1 : a>b ? 1 : 0; }; // Caller should set this (once) if compare or fastCompare will be used with a different comparison
 }
 
 // depth -1: Epsilon node, content is null
@@ -113,7 +115,72 @@ ABRStringStore.prototype.singleton = function (ch) {
     }
 };
 
+ABRStringStore.prototype.dump2 = function (node) {
+    if (this.length(node) > 200) return 'TOO LARGE';
+    if (node.depth < 0) return 'EMPTY';
+    var recurse = function (node, depth) {
+        if (depth === 0) {
+            //base case
+            return [1, ['<td>'+node.content+'</td>']];
+        }
+        var children, label = node.code.toString(16);
+        if (depth & 1) {
+            if (node.depth & 1) {
+                children = [];
+                for (var i = bn_tonum(node.repeat); i > 0; i--)
+                    children.push(node.content);
+            }
+            else {
+                children = [node];
+                label = "&nbsp;";
+            }
+        }
+        else {
+            children = node.content;
+        }
+
+        var ncols = 0;
+        var obuf;
+        children.forEach(function (cn) {
+            var rval = recurse(cn,depth-1);
+            ncols += rval[0];
+            if (!obuf) {
+                obuf = rval[1];
+            }
+            else {
+                for (var i = 0; i < obuf.length; i++)
+                    obuf[i] += rval[1][i];
+            }
+        });
+        obuf.unshift('<td colspan='+ncols+'>'+label+'</td>');
+        return [ncols, obuf];
+    };
+
+    var rret = recurse(node,node.depth);
+    return '<table border=1>' + rret[1].map(function (lv) { return '<tr>' + lv + '</tr>'; }).join('') + '</table>';
+};
+
+ABRStringStore.prototype.dump3 = function (node) {
+    if (node instanceof ABRUnpackedRun) {
+        return (node.start ? '*' : '') + bn_tostr(node.repeat) + '/' + this.dump3(node.sig);
+    }
+    if (Array.isArray(node)) {
+        return '{' + node.map(this.dump3,this).join(' %% ') + '}';
+    }
+    if (node.level <= 0) {
+        return node.content;
+    }
+    return '@' + node.code.toString(16);
+};
+
 ABRStringStore.prototype.dump = function (node) {
+    if (node instanceof ABRUnpackedRun) {
+        return (node.start ? '*' : '') + bn_tostr(node.repeat) + '/' + this.dump(node.sig);
+    }
+    if (Array.isArray(node)) {
+        return '{' + node.map(this.dump,this).join(' %% ') + '}';
+    }
+
     var out = [];
     var next_alias = 1;
     var used_once = new Set();
@@ -132,7 +199,7 @@ ABRStringStore.prototype.dump = function (node) {
     };
 
     var render = function (nn) {
-        if (alias_map.has(nn)) {
+        if (alias_map.has(nn) && nn.depth > 0) {
             if (used_once.has(nn)) {
                 out.push('$'+alias_map.get(nn));
                 return;
@@ -156,7 +223,7 @@ ABRStringStore.prototype.dump = function (node) {
         else {
             out.push('[');
             nn.content.forEach(function (nnn,ix) {
-                if (ix) out.push(' ');
+                if (ix) out.push('\u00b7'.repeat(nn.depth/2));
                 render(nnn);
             });
             out.push(']');
@@ -267,6 +334,158 @@ function concatRecurse(me, left_suf, right_pref) {
     me._computeSegmentation(left_suf, left_wontchange, right_wontchange); //recompute all segmentation symbols betweeen left_wontchange and right_wontchange
     return _runsToSegments(me, left_suf); //convert back to segments
 }
+
+// DELTA_R+1 is not sufficient for lcp, because (taking DELTA_R=1) you could
+// have an intermediate state of:
+// |A B C|D E|
+// |A B C D| F G|
+// where D changes startiness on the basis of the fifth, and after recursing we
+// no longer have any context.  DELTA_R+2 suffices because this guarantees
+// 2*DELTA_R+1 runs after that which changes state, ergo DELTA_R+1 after the
+// first different = DELTA_R+2 total.
+
+// for LCS, the terminator is inside the segment and this does not apply.
+var LCP_WINDOW = DELTA_R + 2;
+var LCS_WINDOW = DELTA_L + 1;
+
+ABRStringStore.prototype._lcpWalk = function(a,b,comparing) {
+    var count = bn_zero,
+        aqueue = [a],
+        bqueue = [b];
+
+    if (a.depth < 0) { return comparing ? (b.depth < 0 ? 0 : -1) : bn_zero; }
+    if (b.depth < 0) { return comparing ? 1 : bn_zero; }
+
+    while (aqueue[0].depth > bqueue[0].depth) {
+        aqueue = _segmentToRuns(aqueue);
+        aqueue = this._runsExtractLeft(aqueue, LCP_WINDOW);
+    }
+
+    while (bqueue[0].depth > aqueue[0].depth) {
+        bqueue = _segmentToRuns(bqueue);
+        bqueue = this._runsExtractLeft(bqueue, LCP_WINDOW);
+    }
+
+    // at most one list contains more than one element.  establish the
+    // difference part of the loop invariant
+    if (aqueue[0] === bqueue[0]) {
+        return comparing ? (bqueue.length > 1 ? -1 : aqueue.length > 1 ? 1 : 0) : this.lengthBig(aqueue[0]);
+    }
+
+    // loop invariant: there are at least LCP_WINDOW items in each list (unless
+    // it ends at end of string) and the firsts are different
+    while (aqueue[0].depth > 0) {
+        aqueue = _segmentToRuns(aqueue);
+        bqueue = _segmentToRuns(bqueue);
+
+        var ahead, bhead;
+        while (true) {
+            if (!(ahead = aqueue[0])) {
+                return comparing ? (bqueue[0] ? -1 : 0) : count;
+            }
+            else if (!(bhead = bqueue[0])) {
+                return comparing ? 1 : count;
+            }
+            else if (ahead.run === bhead.run) {
+                if (!comparing) count = bn_add(count, this.lengthBig(ahead.run));
+                aqueue.shift();
+                bqueue.shift();
+            }
+            else if (ahead.sig == bhead.sig) {
+                if (bn_greater(bhead.repeat,ahead.repeat)) {
+                    bhead.repeat = bn_sub(bhead.repeat, ahead.repeat);
+                    if (!comparing) count = bn_add(count, this.lengthBig(ahead.run));
+                    aqueue.shift();
+                }
+                else {
+                    ahead.repeat = bn_sub(ahead.repeat, bhead.repeat);
+                    if (!comparing) count = bn_add(count, this.lengthBig(bhead.run));
+                    bqueue.shift();
+                }
+            }
+            else {
+                break;
+            }
+        }
+
+        // if we get here, the two queues are headed with different signatures
+        aqueue = this._runsExtractLeft(aqueue, LCP_WINDOW);
+        bqueue = this._runsExtractLeft(bqueue, LCP_WINDOW);
+    }
+
+    return comparing ? this.singletonComparer(aqueue[0].content, bqueue[0].content) : count;
+};
+
+// Fully symmetric to _lcpWalk
+ABRStringStore.prototype._lcsWalk = function(a,b,comparing) {
+    var count = bn_zero,
+        aqueue = [a],
+        bqueue = [b];
+
+    if (a.depth < 0) { return comparing ? (b.depth < 0 ? 0 : -1) : bn_zero; }
+    if (b.depth < 0) { return comparing ? 1 : bn_zero; }
+
+    while (aqueue[0].depth > bqueue[0].depth) {
+        aqueue = _segmentToRuns(aqueue);
+        aqueue = this._runsExtractRight(aqueue, LCS_WINDOW);
+    }
+
+    while (bqueue[0].depth > aqueue[0].depth) {
+        bqueue = _segmentToRuns(bqueue);
+        bqueue = this._runsExtractRight(bqueue, LCS_WINDOW);
+    }
+
+    if (aqueue[aqueue.length - 1] === bqueue[bqueue.length - 1]) {
+        return comparing ? (bqueue.length > 1 ? -1 : aqueue.length > 1 ? 1 : 0) : this.lengthBig(aqueue[aqueue.length - 1]);
+    }
+
+    while (aqueue[0].depth > 0) {
+        aqueue = _segmentToRuns(aqueue);
+        bqueue = _segmentToRuns(bqueue);
+
+        var ahead, bhead;
+        while (true) {
+            if (!(ahead = aqueue[aqueue.length - 1])) {
+                return comparing ? (bqueue[bqueue.length - 1] ? -1 : 0) : count;
+            }
+            else if (!(bhead = bqueue[bqueue.length - 1])) {
+                return comparing ? 1 : count;
+            }
+            else if (ahead.run === bhead.run) {
+                if (!comparing) count = bn_add(count, this.lengthBig(ahead.run));
+                aqueue.pop();
+                bqueue.pop();
+            }
+            else if (ahead.sig == bhead.sig) {
+                if (bn_greater(bhead.repeat,ahead.repeat)) {
+                    bhead.repeat = bn_sub(bhead.repeat, ahead.repeat);
+                    if (!comparing) count = bn_add(count, this.lengthBig(ahead.run));
+                    aqueue.pop();
+                }
+                else {
+                    ahead.repeat = bn_sub(ahead.repeat, bhead.repeat);
+                    if (!comparing) count = bn_add(count, this.lengthBig(bhead.run));
+                    bqueue.pop();
+                }
+            }
+            else {
+                break;
+            }
+        }
+
+        aqueue = this._runsExtractRight(aqueue, LCS_WINDOW);
+        bqueue = this._runsExtractRight(bqueue, LCS_WINDOW);
+    }
+
+    return comparing ? this.singletonComparer(aqueue[aqueue.length - 1].content, bqueue[bqueue.length - 1].content) : count;
+};
+
+ABRStringStore.prototype.lcpBig = function (a,b) { return this._lcpWalk(a,b,false); };
+ABRStringStore.prototype.lcp = function (a,b) { return bn_tonum(this._lcpWalk(a,b,false)); };
+ABRStringStore.prototype.compare = function (a,b) { return this._lcpWalk(a,b,true); };
+ABRStringStore.prototype.equal = function (a,b) { return a === b; };
+ABRStringStore.prototype.lcsBig = function (a,b) { return this._lcsWalk(a,b,false); };
+ABRStringStore.prototype.lcs = function (a,b) { return bn_tonum(this._lcsWalk(a,b,false)); };
 
 function ABRUnpackedRun(run, sig, repeat, start, segm) {
     this.run = run;
@@ -568,6 +787,8 @@ ABRStringStore.prototype.lengthBig = function (nn) {
         return nn.length = len;
     }
 };
+
+ABRStringStore.BigInt = BigInt;
 
 return ABRStringStore;
 });
