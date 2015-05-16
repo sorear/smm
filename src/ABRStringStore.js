@@ -317,7 +317,7 @@ function _runsToSegments(me, runs) {
         if (trial) {
             var ok = 1;
             if (trial.content.length === ix - first) {
-                for (var j = first; j < ix; j++) {
+                for (var j = first+1; j < ix; j++) {
                     if (trial.content[j-first] !== runs[j].run) {
                         ok = 0;
                         break;
