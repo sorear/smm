@@ -195,7 +195,7 @@ ABRStringStore.prototype.toArray = function (node, out, maxLen) {
 // reduce to 31 cases, then using THREE_OF_SEVEN to go to 7.  Local maxima are
 // then extracted, giving an extreme block of 14; but we need to look one
 // further to the left to force the first two flags to 0 1
-var DELTA_L = 4, DELTA_R = 1;
+var DELTA_L = 3, DELTA_R = 1;
 var CONCAT_WINDOW = 2 + DELTA_L + DELTA_R;
 
 // The concat algorithm from the paper, except that the paper only handled
@@ -456,7 +456,7 @@ ABRStringStore.prototype._uproot = function (roots) {
     return roots[0];
 };
 
-var SPLIT_L_COUNT = DELTA_L + DELTA_R + 1;
+var SPLIT_L_COUNT = DELTA_L + DELTA_R + 2;
 var SPLIT_R_COUNT = DELTA_L + DELTA_R + 2;
 ABRStringStore.prototype.split = function (str, ix) {
     //console.log(me.dump(str),ix);
@@ -470,7 +470,7 @@ ABRStringStore.prototype.split = function (str, ix) {
 
 // lsigs contains only sigs that overlap or are left of the cut
 // lsigs+rsigs contains all sigs to recompute and all context
-// after expanding "L" lsigs and having an effective depth of 2L it must be able to satisfy a cut of "L+1" for the recursion and rejoining while keeping a depth of DELTA_L+DELTA_R so that all can be recomputed; the left sentinal is necessarily untouched provided DELTA_L >= 1
+// after expanding "L" lsigs and having an effective depth of 2L it must be able to satisfy a cut of "L+1" for the recursion and rejoining while keeping a depth of DELTA_L+DELTA_R so that all can be recomputed; the left sentinel is necessarily untouched provided DELTA_L >= 1
 function splitRecurse(me,lsigs, rsigs, cut) {
     //console.log(lsigs.map(me.dump,me), rsigs.map(me.dump,me), cut);
     var lsigs_len = bn_zero;
