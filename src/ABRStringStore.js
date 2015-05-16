@@ -85,6 +85,7 @@ function ABRStringNode(store, depth, content) {
     this.content = content;
     this.length = null;
     this.repeat = bn_zero;
+    this.a_seg = null;
     if (depth >= 0) {
         this.code = store._nextCode;
         if (store._nextCode == 0x7FFF0000) throw new Error('ABR Tree is full');
@@ -300,31 +301,57 @@ function _runsToSegments(me, runs) {
     var ix = 0;
     while (ix < runs.length) {
         var fastseg = runs[ix].segm;
-        var ix2 = ix;
-        while (ix2 < runs.length && (ix2 === ix || !runs[ix2].start)) {
-            if (!runs[ix2++].segm) {
+        var first = ix;
+        while (ix < runs.length && (ix === first || !runs[ix].start)) {
+            if (!runs[ix++].segm) {
                 fastseg = null;
-                break;
             }
         }
         if (fastseg) {
             out.push(fastseg);
-            ix = ix2;
             continue;
         }
 
-        var segment = [];
-        var hkey = '';
-        var first = ix;
-        while (ix < runs.length && (ix === first || !runs[ix].start)) {
-            var run = runs[ix++].run;
-            segment.push(run);
-            hkey = hkey + ':' + run.code;
+        var trial = runs[first].run.a_seg;
+
+        if (trial) {
+            var ok = 1;
+            if (trial.content.length === ix - first) {
+                for (var j = first; j < ix; j++) {
+                    if (trial.content[j-first] !== runs[j].run) {
+                        ok = 0;
+                        break;
+                    }
+                }
+            }
+            else {
+                ok = 0;
+            }
+
+            if (ok) {
+                out.push(trial);
+                continue;
+            }
+
+            var segment = [];
+            var hkey = '';
+            for (var j = first; j < ix; j++) {
+                var run = runs[j].run;
+                segment.push(run);
+                hkey = hkey + ':' + run.code;
+            }
+            var ptr = me._blocks;
+            fastseg = ptr[hkey];
+            if (!fastseg) ptr[hkey] = fastseg = new ABRStringNode(me, (segment[0].depth|1)+1, segment);
+            out.push(fastseg);
         }
-        var ptr = me._blocks;
-        fastseg = ptr[hkey];
-        if (!fastseg) ptr[hkey] = fastseg = new ABRStringNode(me, (segment[0].depth|1)+1, segment);
-        out.push(fastseg);
+        else {
+            var segment = [];
+            for (var j = first; j < ix; j++) {
+                segment.push(runs[j].run);
+            }
+            out.push(runs[first].run.a_seg = new ABRStringNode(me, (segment[0].depth|1)+1, segment));
+        }
     }
     return out;
 }
@@ -409,8 +436,8 @@ ABRStringStore.prototype._computeSegmentation = function (runs, left_fixed, righ
         var rkey = bn_tokey(runs[i].repeat);
         var rnode = cmap.get(rkey);
         if (!rnode) {
-            /*A*/if (bn_equal(runs[i].repeat,bn_zero)) throw 'zero length repeat';
-            /*A*/if (runs[i].sig.depth & 1) throw 'tried to make a run of runs';
+            //A//if (bn_equal(runs[i].repeat,bn_zero)) throw 'zero length repeat';
+            //A//if (runs[i].sig.depth & 1) throw 'tried to make a run of runs';
             cmap.set(rkey, rnode = new ABRStringNode(this, runs[i].sig.depth+1, runs[i].sig));
             rnode.repeat = runs[i].repeat;
         }
