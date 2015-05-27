@@ -20,7 +20,8 @@ function srand(seed) {
 
 function BaselineStore() { }
 BaselineStore.prototype.emptyString = '';
-BaselineStore.prototype.concat = function (x,y) { return x + y; };
+var q;
+BaselineStore.prototype.concat = function (x,y) { var r = x + y; q = r[0]; return r; }; // defeat ConsString optimization
 BaselineStore.prototype.split = function (x,i) { return [x.substr(0,i*2),x.substr(i*2)]; };
 BaselineStore.prototype.singleton = function (x) { return x < 10 ? '0'+x : ''+x; };
 BaselineStore.prototype.length = function (x) { return x.length / 2 };
