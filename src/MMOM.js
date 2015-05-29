@@ -9,6 +9,7 @@ define([], function () {
 function MMSource(name, string) {
     this.name = name;
     this.text = string;
+    this.failed = false;
     this.eolMaps = null;
 }
 
@@ -137,6 +138,21 @@ function MMScanner(root, resolver) {
     this.include_file = null;
     this.segment = new MMSegment();
 
+    if (typeof resolver === 'string') {
+        resolver = new Map([[ root, resolver ]]);
+    }
+    var resolve_data;
+    if (typeof resolver === 'object') {
+        resolve_data = resolver;
+        resolver = function (src) {
+            src.text = resolve_data.get(src.name);
+            if (src.text === undefined) {
+                src.text = '';
+                src.failed = true;
+            }
+        };
+    }
+
     //Input
     this.queue = [];
     this.included = {};
@@ -148,7 +164,7 @@ function MMScanner(root, resolver) {
 }
 
 MMScanner.prototype.getToken = function () {
-    var ix = this.index, str = this.source.text, len = this.length, start = ix, chr;
+    var ix = this.index, str = this.source.text, len = this.length, start, chr;
 
     // source not yet loaded
     if (str === null) {
@@ -159,13 +175,24 @@ MMScanner.prototype.getToken = function () {
     }
 
     while (ix < len && " \t\r\f\n".indexOf(str[ix]) >= 0) ix++;
-    this.token_start = ix;
+    this.token_start = start = ix;
     while (ix < len && " \t\r\f\n".indexOf(chr = str[ix]) < 0) {
         if (chr < ' ' || chr > '~') this.addError('bad-character');
         ix++;
     }
 
     this.index = ix;
+
+    if (start === ix) {
+        if (this.length < 0) {
+            // abuse length to record EOF-hit
+            this.length = ix;
+            if (this.source.failed)
+                this.addError('failed-to-read');
+        }
+        return '';
+    }
+
     return str.substring(start, ix);
 };
 
@@ -342,7 +369,7 @@ MMScanner.prototype.scan = function () {
 
             case '$.':
                 if (state === S_MATH || state === S_PROOF) {
-                    if (type === PROVABLE && state === S_MATH) {
+                    if (this.segment.type === MMSegment.PROVABLE && state === S_MATH) {
                         this.addError('missing-proof');
                     }
                     this.newSegment();
@@ -352,10 +379,11 @@ MMScanner.prototype.scan = function () {
                     this.segment.type = MMSegment.BOGUS;
                     this.newSegment();
                 }
+                state = S_IDLE;
                 break;
 
             case '$=':
-                if (state !== S_MATH || this.segment.type === MMSegment.PROVABLE) {
+                if (state !== S_MATH || this.segment.type !== MMSegment.PROVABLE) {
                     this.addError('spurious-proof');
                     this.segment.type = MMSegment.BOGUS;
                 }
