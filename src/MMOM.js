@@ -6,24 +6,28 @@ define([], function () {
 // This data model is fairly similar to that used by METAMATH.C, although we
 // make statement-level comments their own kind of segment.
 
-function MMSource(string) {
+function MMSource(name, string) {
+    this.name = name;
     this.text = string;
     this.eolMaps = null;
 }
 
 // hot inner loop, avoid stuff that could deopt
 function eolScan(string, array, sfirst, send, afirst) {
+    //console.log('SCAN',string.length,send-sfirst,sfirst,afirst);
     var slen = string.length;
     while (sfirst < send) {
         var ch = string.charCodeAt(sfirst++);
-        if (ch === 10) {
-            array[afirst++] = sfirst;
-        }
-        else if (ch === 13) {
-            if (sfirst !== send && string.charCodeAt(sfirst) === 10) {
-                sfirst++; // skip LF after CR; note, sfirst>send is possible now
+        if (ch <= 13) {
+            if (ch === 10) {
+                array[afirst++] = sfirst;
             }
-            array[afirst++] = sfirst;
+            else if (ch === 13) {
+                if (sfirst !== send && string.charCodeAt(sfirst) === 10) {
+                    sfirst++; // skip LF after CR; note, sfirst>send is possible now
+                }
+                array[afirst++] = sfirst;
+            }
         }
     }
 
@@ -36,12 +40,13 @@ function getEolArray(string) {
 
     out.push(new Int32Array([0]));
 
+    var quantum = Math.max(100, Math.floor(string.length / 100));
     while (sfirst < string.length) {
-        var alen = Math.max(100, string.length / 100);
+        var alen = 2*quantum;
         var acur = new Int32Array(alen);
         var aix  = 0;
 
-        while (sfirst < string.length && (alen - aix) >= 50) {
+        while (sfirst < string.length && (alen - aix) >= quantum) {
             var tmp = eolScan(string, acur, sfirst, sfirst + Math.min(string.length - sfirst, alen - aix), aix);
             sfirst = tmp[0];
             aix = tmp[1];
@@ -85,15 +90,23 @@ MMSource.prototype.lookupPos = function (pos) {
         }
     }
 
-    return [ low+skip+1, the_map[low] ];
+    return [ low+skip+1, pos-the_map[low]+1 ]; // "column" will be slightly off in the presence of tabs (evil) and supplementary characters (I care, but not much)
 };
 
 function MMSegment() {
     this.type = MMSegment.EOF;
-    this.raw = null;
+    this.spans = [];
     this.label = null;
     this.math = null;
     this.proof = null;
+    this.errors = null;
+}
+
+function MMError(source, offset, category, code) {
+    this.source = source;
+    this.offset = offset;
+    this.category = category;
+    this.code = code;
 }
 
 MMSegment.EOF = 1;
@@ -108,19 +121,42 @@ MMSegment.PROVABLE = 9;
 MMSegment.BOGUS = 10;
 MMSegment.ESSEN = 11;
 MMSegment.FLOAT = 12;
+MMSegment.INCLUDE = 13;
 
-function MMScanner(text) {
-    this.text = text;
-    this.source = new MMSource(text);
-    this.index = 0;
-    this.token_start = 0;
-    this.segment = new MMSegment();
+var S_IDLE=1,S_LABEL=2,S_MATH=3,S_PROOF=4;
+
+function MMScanner(root, resolver) {
+    //Output
     this.segment_start = 0;
     this.segments = [];
+
+    //State machine
+    this.state = S_IDLE;
+    this.comment_state = false;
+    this.directive_state = false;
+    this.include_file = null;
+    this.segment = new MMSegment();
+
+    //Input
+    this.queue = [];
+    this.included = {};
+    this.resolver = resolver;
+    resolver(this.source = this.included[root] = new MMSource(root, null));
+    this.index = 0;
+    this.length = -1;
+    this.token_start = 0;
 }
 
 MMScanner.prototype.getToken = function () {
-    var ix = this.index, str = this.text, len = str.length, start = ix, chr;
+    var ix = this.index, str = this.source.text, len = this.length, start = ix, chr;
+
+    // source not yet loaded
+    if (str === null) {
+        return null;
+    }
+    if (len < 0) {
+        len = str.length;
+    }
 
     while (ix < len && " \t\r\f\n".indexOf(str[ix]) >= 0) ix++;
     this.token_start = ix;
@@ -133,12 +169,46 @@ MMScanner.prototype.getToken = function () {
     return str.substring(start, ix);
 };
 
+MMScanner.prototype.includeFile = function (file) {
+    if (this.included[file])
+        return;
+
+    var src = this.included[file] = new MMSource(file, null);
+    this.resolver(src);
+
+    // return to the current source
+    this.queue.push({ source: this.source, index: this.index, length: this.length });
+    // do the other thing first
+    this.queue.push({ source: new MMSource(null), index: 0, length: -1 });
+    // switch ASAP
+    this.length = this.index;
+};
+
+// call this after getToken has returned '' at least once
+MMScanner.prototype.nextSource = function () {
+    var end = this.length < 0 ? this.source.text.length : this.length;
+    var index = this.index;
+    if (end > index) {
+        this.segment.spans.push(this.source, index, end);
+    }
+
+    var rec = this.queue.pop();
+    this.source = rec.source;
+    this.index = rec.index;
+    this.length = rec.length;
+};
+
 MMScanner.prototype.addError = function (code) {
-    TODO;
+    if (this.segment.errors === null) this.segment.errors = [];
+    this.segment.errors.push(new MMError(this.source, this.token_start, 'scanner', code));
+};
+
+MMScanner.prototype.hasSpans = function () {
+    return this.segment_start !== this.index || this.segment.spans.length !== 0;
 };
 
 MMScanner.prototype.newSegment = function () {
-    this.segment.raw = this.text.substring(this.segment_start, this.index);
+    this.segment.spans.push(this.source, this.segment_start, this.index);
     this.segments.push(this.segment);
 
     this.segment_start = this.index;
@@ -171,26 +241,32 @@ var KW_ATOMIC = {
     '': true,
 };
 
-// quick and dirty scanner, will replace with a streaming and $[ aware one later
+// quick and dirty scanner
 MMScanner.prototype.scan = function () {
-    var in_comment;
-    var S_IDLE=1,S_LABEL=2,S_MATH=3,S_PROOF=4;
-    var segment_start = 0;
-    var state=S_IDLE;
+    var comment_state = this.comment_state;
+    var directive_state = this.directive_state;
+    var state = this.state;
     var token;
 
     // note: this version of the loop tokenizes everything, even comments and proofs, which is somewhat wasteful
     while (true) {
         token = this.getToken();
 
-        if (in_comment) {
+        if (token === null) {
+            this.comment_state = comment_state;
+            this.state = state;
+            this.directive_state = directive_state;
+            return false;
+        }
+
+        if (comment_state) {
             switch (token) {
                 case '$(':
                     this.addError('nested-comment');
                     break;
 
                 case '$)':
-                    in_comment = false;
+                    comment_state = false;
 
                     if (state === S_IDLE) {
                         this.segment.type = MMSegment.COMMENT;
@@ -201,7 +277,7 @@ MMScanner.prototype.scan = function () {
 
                 case '':
                     this.addError('eof-in-comment');
-                    in_comment = false;
+                    comment_state = false;
                     break; // full EOF processing on next loop
 
                 default:
@@ -209,111 +285,175 @@ MMScanner.prototype.scan = function () {
                         this.addError('pseudo-comment-end');
                     break;
             }
+
+            continue;
         }
-        else {
-            switch (token) {
-                case '$(':
-                    in_comment = true;
+
+        if (directive_state) {
+            if (token === '$]') {
+                if (this.include_file === null) {
+                    this.addError('missing-filename');
                     break;
+                }
 
-                case '$)':
-                    this.addError('loose-comment-end');
-                    break;
+                this.includeFile(this.include_file);
 
-                case '$.';
-                    if (state === S_MATH || state === S_PROOF) {
-                        if (type === PROVABLE && state === S_MATH) {
-                            this.addError('missing-proof');
-                        }
-                        this.newSegment();
-                    }
-                    else {
-                        this.addError('spurious-period');
-                        this.segment.type = MMSegment.BOGUS;
-                        this.newSegment();
-                    }
-                    break;
+                if (state === S_IDLE) {
+                    this.segment.type = MMSegment.INCLUDE;
+                    this.newSegment();
+                }
 
-                case '$=':
-                    if (state !== S_MATH || this.segment.type === MMSegment.PROVABLE) {
-                        this.addError('spurious-proof');
-                        this.segment.type = MMSegment.BOGUS;
-                    }
-                    state = S_PROOF;
-                    this.segment.proof = [];
-                    break;
-
-                case '$[':
-                    this.addError('include-unsupported');
-                    break;
-
-                case '$]':
-                    this.addError('include-unsupported');
-                    break;
-
-                case '$a';
-                case '$c';
-                case '$d';
-                case '$e';
-                case '$f';
-                case '$p';
-                case '$v';
-                case '${':
-                case '$}':
-                case '':
-                    if (state === S_MATH) {
-                        this.addError('nonterminated-math');
-                        this.newSegment();
-                        state = S_IDLE;
-                    }
-                    else if (state === S_PROOF) {
-                        this.addError('nonterminated-proof');
-                        this.newSegment();
-                        state = S_IDLE;
-                    }
-
-                    if (KW_LABEL[token]) {
-                        if (state !== S_LABEL) this.addError('missing-label');
-                    }
-                    else {
-                        if (state === S_LABEL) this.addError('spurious-label');
-                    }
-
-                    this.segment.type = KW_TYPE[token];
-
-                    if (KW_ATOMIC[token]) {
-                        this.newSegment();
-                        state = S_IDLE;
-                        if (token === '') return;
-                    }
-                    else {
-                        state = S_MATH;
-                        this.segment.math = [];
-                    }
-                    break;
-
-                default:
-                    if (token.indexOf('$') >= 0) {
-                        this.addError('pseudo-keyword');
-                        break;
-                    }
-
-                    if (state === S_IDLE) {
-                        this.segment.label = token;
-                        state = S_LABEL;
-                    }
-                    else if (state === S_LABEL) {
-                        this.addError('duplicate-label');
-                        this.segment.label = token;
-                    }
-                    else if (state === S_MATH) {
-                        this.segment.math.push(token);
-                    }
-                    else if (state === S_PROOF) {
-                        this.segment.proof.push(token);
-                    }
-                    break;
+                break;
             }
+
+            if (token === '') {
+                this.addError('unterminated-directive');
+                directive_state = false;
+                break;
+            }
+
+            if (this.include_file !== null) {
+                this.addError('directive-too-long');
+                break;
+            }
+
+            if (token.indexOf('$') >= 0) {
+                this.addError('dollar-in-filename');
+                break;
+            }
+
+            this.include_file = token;
+            break;
+        }
+
+        switch (token) {
+            case '$(':
+                comment_state = true;
+                break;
+
+            case '$[':
+                directive_state = true;
+                this.include_file = null;
+                break;
+
+            case '$)':
+                this.addError('loose-comment-end');
+                break;
+
+            case '$.':
+                if (state === S_MATH || state === S_PROOF) {
+                    if (type === PROVABLE && state === S_MATH) {
+                        this.addError('missing-proof');
+                    }
+                    this.newSegment();
+                }
+                else {
+                    this.addError('spurious-period');
+                    this.segment.type = MMSegment.BOGUS;
+                    this.newSegment();
+                }
+                break;
+
+            case '$=':
+                if (state !== S_MATH || this.segment.type === MMSegment.PROVABLE) {
+                    this.addError('spurious-proof');
+                    this.segment.type = MMSegment.BOGUS;
+                }
+                state = S_PROOF;
+                this.segment.proof = [];
+                break;
+
+            case '$[':
+                this.addError('include-unsupported');
+                break;
+
+            case '$]':
+                this.addError('include-unsupported');
+                break;
+
+            case '$a':
+            case '$c':
+            case '$d':
+            case '$e':
+            case '$f':
+            case '$p':
+            case '$v':
+            case '${':
+            case '$}':
+            case '':
+                if (token === '' && this.queue.length) {
+                    // file switch: need not interrupt a statement
+
+                    if (state === S_IDLE && this.hasSpans()) {
+                        this.segment.type = MMSegment.EOF;
+                        this.newSegment();
+                    }
+
+                    this.nextSource();
+                    break;
+                }
+
+                if (state === S_MATH) {
+                    this.addError('nonterminated-math');
+                    this.newSegment();
+                    state = S_IDLE;
+                }
+                else if (state === S_PROOF) {
+                    this.addError('nonterminated-proof');
+                    this.newSegment();
+                    state = S_IDLE;
+                }
+
+                if (KW_LABEL[token]) {
+                    if (state !== S_LABEL) this.addError('missing-label');
+                }
+                else {
+                    if (state === S_LABEL) this.addError('spurious-label');
+                }
+
+                this.segment.type = KW_TYPE[token];
+
+                if (KW_ATOMIC[token]) {
+                    this.newSegment();
+                    state = S_IDLE;
+                    if (token === '') return;
+                }
+                else {
+                    state = S_MATH;
+                    this.segment.math = [];
+                }
+                break;
+
+            default:
+                if (token.indexOf('$') >= 0) {
+                    this.addError('pseudo-keyword');
+                    break;
+                }
+
+                if (state === S_IDLE) {
+                    this.segment.label = token;
+                    state = S_LABEL;
+                }
+                else if (state === S_LABEL) {
+                    this.addError('duplicate-label');
+                    this.segment.label = token;
+                }
+                else if (state === S_MATH) {
+                    this.segment.math.push(token);
+                }
+                else if (state === S_PROOF) {
+                    this.segment.proof.push(token);
+                }
+                break;
         }
     }
-}
+};
+
+return {
+    Source: MMSource,
+    Error: MMError,
+    Segment: MMSegment,
+    Scanner: MMScanner,
+};
+
+});

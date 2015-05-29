@@ -22,7 +22,7 @@ describe('The string store object', function () {
         it('deduplicates singleton nodes', function () { expect(ss.singleton(7)).toBe(ss.singleton(7)); });
         it('creates different nodes for different singletons', function () { expect(ss.singleton(8)).not.toBe(ss.singleton(9)); });
         it('creates runs for repeated values', function () { expect(ss.dump(ss.concat(ss.singleton(5),ss.singleton(5)))).toBe('[5(*2)]'); });
-        it('creates groups for dissimilar values', function () { expect(ss.dump(ss.concat(ss.singleton(5),ss.singleton(6)))).toBe('[5 6]'); });
+        it('creates groups for dissimilar values', function () { expect(ss.dump(ss.concat(ss.singleton(5),ss.singleton(6)))).toBe('[5·6]'); });
     });
     // that's about all we can do without being hypersensitive to details of the segmenter
 
