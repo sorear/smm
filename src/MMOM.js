@@ -101,7 +101,20 @@ function MMSegment() {
     this.math = null;
     this.proof = null;
     this.errors = null;
+    this.mathPos = null;
+    this.startPos = null;
+    this.proofPos = null;
 }
+
+Object.defineProperty(MMSegment.prototype, 'raw', {
+    get: function () {
+        var out = '', spans = this.spans;
+        for (var i = 0; i < spans.length; i += 3) {
+            out += spans[i].text.substr(spans[i+1],spans[i+2]);
+        }
+        return out;
+    }
+});
 
 function MMError(source, offset, category, code) {
     this.source = source;
@@ -130,6 +143,8 @@ function MMScanner(root, resolver) {
     //Output
     this.segment_start = 0;
     this.segments = [];
+    this.db = null;
+    this.errors = [];
 
     //State machine
     this.state = S_IDLE;
@@ -226,8 +241,7 @@ MMScanner.prototype.nextSource = function () {
 };
 
 MMScanner.prototype.addError = function (code) {
-    if (this.segment.errors === null) this.segment.errors = [];
-    this.segment.errors.push(new MMError(this.source, this.token_start, 'scanner', code));
+    this.errors.push(new MMError(this.source, this.token_start, 'scanner', code));
 };
 
 MMScanner.prototype.hasSpans = function () {
@@ -383,12 +397,13 @@ MMScanner.prototype.scan = function () {
                 break;
 
             case '$=':
-                if (state !== S_MATH || this.segment.type !== MMSegment.PROVABLE) {
+                if ((state !== S_MATH || this.segment.type !== MMSegment.PROVABLE) && this.segment.type !== MMSegment.BOGUS) {
                     this.addError('spurious-proof');
                     this.segment.type = MMSegment.BOGUS;
                 }
                 state = S_PROOF;
                 this.segment.proof = [];
+                this.segment.proofPos = [];
                 break;
 
             case '$[':
@@ -432,23 +447,35 @@ MMScanner.prototype.scan = function () {
                     state = S_IDLE;
                 }
 
+                this.segment.type = KW_TYPE[token];
+
                 if (KW_LABEL[token]) {
-                    if (state !== S_LABEL) this.addError('missing-label');
+                    if (state !== S_LABEL) {
+                        this.addError('missing-label');
+                        this.segment.type = MMSegment.BOGUS;
+                    }
                 }
                 else {
                     if (state === S_LABEL) this.addError('spurious-label');
+                    this.label = null;
+                    this.segment.startPos = [this.source, this.token_start];
                 }
 
-                this.segment.type = KW_TYPE[token];
-
                 if (KW_ATOMIC[token]) {
+                    if (token === '') {
+                        this.db = new MMDatabase;
+                        this.db.segments = this.segments;
+                        this.db.scanErrors = this.errors;
+                        if (this.hasSpans()) this.newSegment();
+                        return this.db;
+                    }
                     this.newSegment();
                     state = S_IDLE;
-                    if (token === '') return;
                 }
                 else {
                     state = S_MATH;
                     this.segment.math = [];
+                    this.segment.mathPos = [];
                 }
                 break;
 
@@ -459,6 +486,8 @@ MMScanner.prototype.scan = function () {
                 }
 
                 if (state === S_IDLE) {
+                    if (/[^-_.0-9a-zA-Z]/.test(token))
+                        this.addError('invalid-label');
                     this.segment.label = token;
                     state = S_LABEL;
                 }
@@ -468,13 +497,25 @@ MMScanner.prototype.scan = function () {
                 }
                 else if (state === S_MATH) {
                     this.segment.math.push(token);
+                    this.segment.mathPos.push(this.source, this.token_start);
                 }
                 else if (state === S_PROOF) {
                     this.segment.proof.push(token);
+                    this.segment.proofPos.push(this.source, this.token_start);
                 }
                 break;
         }
     }
+};
+
+function MMDatabase() {
+    this.segments = null;
+    this.scanErrors = null;
+    this.plugins = {};
+}
+
+MMScanner.parseSync = function (name, resolver) {
+    return new MMScanner(name, resolver).scan();
 };
 
 return {
@@ -482,6 +523,7 @@ return {
     Error: MMError,
     Segment: MMSegment,
     Scanner: MMScanner,
+    Database: MMDatabase,
 };
 
 });
