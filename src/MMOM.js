@@ -139,7 +139,7 @@ MMSegment.INCLUDE = 13;
 
 var S_IDLE=1,S_LABEL=2,S_MATH=3,S_PROOF=4;
 
-function MMScanner(root, resolver) {
+function MMScanner(root, resolver, sync) {
     //Output
     this.segment_start = 0;
     this.segments = [];
@@ -167,12 +167,14 @@ function MMScanner(root, resolver) {
             }
         };
     }
+    this.sync = sync;
 
     //Input
     this.queue = [];
     this.included = {};
     this.resolver = resolver;
     resolver(this.source = this.included[root] = new MMSource(root, null));
+    if (this.sync && this.source.text === null) throw 'Resolver failed to synchronously return text in parseSync context';
     this.index = 0;
     this.length = -1;
     this.token_start = 0;
@@ -217,11 +219,12 @@ MMScanner.prototype.includeFile = function (file) {
 
     var src = this.included[file] = new MMSource(file, null);
     this.resolver(src);
+    if (this.sync && src.text === null) throw 'Resolver failed to synchronously return text in parseSync context';
 
     // return to the current source
     this.queue.push({ source: this.source, index: this.index, length: this.length });
     // do the other thing first
-    this.queue.push({ source: new MMSource(null), index: 0, length: -1 });
+    this.queue.push({ source: src, index: 0, length: -1 });
     // switch ASAP
     this.length = this.index;
 };
@@ -229,14 +232,14 @@ MMScanner.prototype.includeFile = function (file) {
 // call this after getToken has returned '' at least once
 MMScanner.prototype.nextSource = function () {
     var end = this.length < 0 ? this.source.text.length : this.length;
-    var index = this.index;
-    if (end > index) {
-        this.segment.spans.push(this.source, index, end);
+    var segment_start = this.segment_start;
+    if (end !== segment_start) {
+        this.segment.spans.push(this.source, segment_start, end);
     }
 
     var rec = this.queue.pop();
     this.source = rec.source;
-    this.index = rec.index;
+    this.index = this.segment_start = rec.index;
     this.length = rec.length;
 };
 
@@ -332,9 +335,10 @@ MMScanner.prototype.scan = function () {
 
         if (directive_state) {
             if (token === '$]') {
+                directive_state = false;
                 if (this.include_file === null) {
                     this.addError('missing-filename');
-                    break;
+                    continue;
                 }
 
                 this.includeFile(this.include_file);
@@ -344,27 +348,27 @@ MMScanner.prototype.scan = function () {
                     this.newSegment();
                 }
 
-                break;
+                continue;
             }
 
             if (token === '') {
                 this.addError('unterminated-directive');
                 directive_state = false;
-                break;
+                continue;
             }
 
             if (this.include_file !== null) {
                 this.addError('directive-too-long');
-                break;
+                continue;
             }
 
             if (token.indexOf('$') >= 0) {
                 this.addError('dollar-in-filename');
-                break;
+                continue;
             }
 
             this.include_file = token;
-            break;
+            continue;
         }
 
         switch (token) {
@@ -515,7 +519,7 @@ function MMDatabase() {
 }
 
 MMScanner.parseSync = function (name, resolver) {
-    return new MMScanner(name, resolver).scan();
+    return new MMScanner(name, resolver, true).scan();
 };
 
 return {
