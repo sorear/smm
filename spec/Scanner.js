@@ -1,4 +1,7 @@
 var mmom = require('../src/MMOM.js');
+function deep(x) { console.log(require('util').inspect(x,{depth:null,colors:true})); }
+function err(db,i) { var e = db.scanErrors[i]; return e ? [ e.source.name, e.offset, e.category, e.code ] : []; }
+function seg(db,i) { var e = db.segments[i]; return e ? [ e.type, e.raw, e.math, e.proof ] : []; }
 
 describe('scan empty database:', function () {
     var db;
@@ -115,7 +118,6 @@ describe('scan w/ resolver argument:', function () {
     it('has no errors', function () { expect(db.scanErrors.length).toBe(0); });
 });
 
-function deep(x) { console.log(require('util').inspect(x,{depth:null,colors:true})); }
 describe('simple file inclusion:', function () {
     var db;
     beforeAll(function () { db = mmom.Scanner.parseSync('afile',(new Map).set('afile','$[ bfile $]').set('bfile','$}')); });
@@ -125,4 +127,35 @@ describe('simple file inclusion:', function () {
     it('second is close', function () { expect(db.segments[1].type).toBe(mmom.Segment.CLOSE); });
     it('containing source', function () { expect(db.segments[1].raw).toBe('$}'); });
     it('has no errors', function () { expect(db.scanErrors.length).toBe(0); });
+});
+
+describe('inclusion of root file is ignored:', function () {
+    var db;
+    beforeAll(function () { db = mmom.Scanner.parseSync('afile',(new Map).set('afile','$[ afile $]')); });
+    it('has one segments', function () { expect(db.segments.length).toBe(1); });
+    it('first is include per se', function () { expect(db.segments[0].type).toBe(mmom.Segment.INCLUDE); });
+    it('containing source', function () { expect(db.segments[0].raw).toBe('$[ afile $]'); });
+    it('has no errors', function () { expect(db.scanErrors.length).toBe(0); });
+});
+
+describe('inclusion of nonexistant file:', function () {
+    var db;
+    beforeAll(function () { db = mmom.Scanner.parseSync('afile',(new Map).set('afile','$[ bfile $]')); });
+    it('has one segments', function () { expect(db.segments.length).toBe(1); });
+    it('first is include per se', function () { expect(db.segments[0].type).toBe(mmom.Segment.INCLUDE); });
+    it('containing source', function () { expect(db.segments[0].raw).toBe('$[ bfile $]'); });
+    it('has one error', function () { expect(db.scanErrors.length).toBe(1); });
+    it('failed-to-read error', function () { expect(err(db,0)).toEqual(['bfile',0,'scanner','failed-to-read']); });
+});
+
+describe('comment spanning include:', function () {
+    var db;
+    beforeAll(function () { db = mmom.Scanner.parseSync('afile',(new Map).set('afile','$[ bfile $] text $)').set('bfile','$( comment')); });
+    it('has 3 segments', function () { expect(db.segments.length).toBe(3); });
+    it('first is include', function () { expect(seg(db,0)).toEqual([mmom.Segment.INCLUDE,'$[ bfile $]',null,null]); });
+    it('second is comment fragment in an EOF', function () { expect(seg(db,1)).toEqual([mmom.Segment.EOF,'$( comment',null,null]); });
+    it('third is trailing portion of wrapping file in an EOF', function () { expect(seg(db,2)).toEqual([mmom.Segment.EOF,' text $)',null,null]); });
+    it('nonterminated comment error', function () { expect(err(db,0)).toEqual(['bfile',10,'scanner','eof-in-comment']); });
+    it('loose $) error', function () { expect(err(db,1)).toEqual(['afile',17,'scanner','loose-comment-end']); });
+    it('spurious label error', function () { expect(err(db,2)).toEqual(['afile',19,'scanner','spurious-label']); });
 });
