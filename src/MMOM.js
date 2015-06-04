@@ -501,6 +501,7 @@ MMScanner.prototype.scan = function () {
                     if (/[^-_.0-9a-zA-Z]/.test(token))
                         this.addError('invalid-label');
                     this.segment.label = token;
+                    this.segment.startPos = [this.source, this.token_start];
                     state = S_LABEL;
                 }
                 else if (state === S_LABEL) {

@@ -2,6 +2,8 @@ var mmom = require('../src/MMOM.js');
 function deep(x) { console.log(require('util').inspect(x,{depth:null,colors:true})); }
 function err(db,i) { var e = db.scanErrors[i]; return e ? [ e.source.name, e.offset, e.category, e.code ] : []; }
 function seg(db,i) { var e = db.segments[i]; return e ? [ e.type, e.raw, e.math, e.proof ] : []; }
+function seg2(db,i) { var e = db.segments[i]; return e ? [ e.type, e.raw, e.math, e.proof, e.label ] : []; }
+function pos(db,i,s) { return db.segments[i][s].map(function (v,ix) { return ix%2 ? v : v.name; }); }
 
 describe('scan empty database:', function () {
     var db;
@@ -231,7 +233,7 @@ describe('two tokens in include:', function () {
     it('bad filename', function () { expect(err(db,0)).toEqual(['afile',9,'scanner','directive-too-long']); });
 });
 
-describe('attempt to span file end with directive', function () {
+describe('attempt to span file end with directive:', function () {
     var db;
     beforeAll(function () { db = mmom.Scanner.parseSync('afile',new Map().set('afile','$[ bfile $] $]').set('bfile','$[ cfile')); });
     it('has three segments', function () { expect(db.segments.length).toBe(3); });
@@ -241,4 +243,86 @@ describe('attempt to span file end with directive', function () {
     it('has 2 errors', function () { expect(db.scanErrors.length).toBe(2); });
     it('unterminated directive', function () { expect(err(db,0)).toEqual(['bfile',8,'scanner','unterminated-directive']); });
     it('loose directive end', function () { expect(err(db,1)).toEqual(['afile',12,'scanner','loose-directive-end']); });
+});
+
+describe('missing proof:', function () {
+    var db;
+    beforeAll(function () { db = mmom.Scanner.parseSync('afile','foo $p x y $.'); });
+    it('has 1 segments', function () { expect(db.segments.length).toBe(1); });
+    it('first is $p', function () { expect(seg2(db,0)).toEqual([mmom.Segment.PROVABLE,'foo $p x y $.',['x','y'],[],'foo']); });
+    it('has 1 errors', function () { expect(db.scanErrors.length).toBe(1); });
+    it('missing proof', function () { expect(err(db,0)).toEqual(['afile',11,'scanner','missing-proof']); });
+});
+
+describe('valid $p statement:', function () {
+    var db;
+    beforeAll(function () { db = mmom.Scanner.parseSync('afile','   foo $p x y $= z $( k $) w $.'); });
+    it('has 1 segments', function () { expect(db.segments.length).toBe(1); });
+    it('first is $p', function () { expect(seg2(db,0)).toEqual([mmom.Segment.PROVABLE,'   foo $p x y $= z $( k $) w $.',['x','y'],['z','w'],'foo']); });
+    it('label position', function () { expect(pos(db,0,'startPos')).toEqual(['afile',3]); });
+    it('math positions', function () { expect(pos(db,0,'mathPos')).toEqual(['afile',10,'afile',12]); });
+    it('proof positions', function () { expect(pos(db,0,'proofPos')).toEqual(['afile',17,'afile',27]); });
+    it('has 0 errors', function () { expect(db.scanErrors.length).toBe(0); });
+});
+
+describe('valid $a statement:', function () {
+    var db;
+    beforeAll(function () { db = mmom.Scanner.parseSync('afile','   foo $a x y $.'); });
+    it('has 1 segments', function () { expect(db.segments.length).toBe(1); });
+    it('first is $a', function () { expect(seg2(db,0)).toEqual([mmom.Segment.AXIOM,'   foo $a x y $.',['x','y'],null,'foo']); });
+    it('label position', function () { expect(pos(db,0,'startPos')).toEqual(['afile',3]); });
+    it('math positions', function () { expect(pos(db,0,'mathPos')).toEqual(['afile',10,'afile',12]); });
+    it('has 0 errors', function () { expect(db.scanErrors.length).toBe(0); });
+});
+
+describe('valid $e statement:', function () {
+    var db;
+    beforeAll(function () { db = mmom.Scanner.parseSync('afile','   foo $e x y $.'); });
+    it('has 1 segments', function () { expect(db.segments.length).toBe(1); });
+    it('first is $e', function () { expect(seg2(db,0)).toEqual([mmom.Segment.ESSEN,'   foo $e x y $.',['x','y'],null,'foo']); });
+    it('has 0 errors', function () { expect(db.scanErrors.length).toBe(0); });
+});
+
+describe('valid $f statement:', function () {
+    var db;
+    beforeAll(function () { db = mmom.Scanner.parseSync('afile','   foo $f x y $.'); });
+    it('has 1 segments', function () { expect(db.segments.length).toBe(1); });
+    it('first is $f', function () { expect(seg2(db,0)).toEqual([mmom.Segment.FLOAT,'   foo $f x y $.',['x','y'],null,'foo']); });
+    it('has 0 errors', function () { expect(db.scanErrors.length).toBe(0); });
+});
+
+describe('spurious proof:', function () {
+    var db;
+    beforeAll(function () { db = mmom.Scanner.parseSync('afile','   foo $f x y $= z $.'); });
+    it('has 1 segments', function () { expect(db.segments.length).toBe(1); });
+    it('first is $f', function () { expect(seg2(db,0)).toEqual([mmom.Segment.BOGUS,'   foo $f x y $= z $.',['x','y','z'],null,'foo']); });
+    it('has 1 errors', function () { expect(db.scanErrors.length).toBe(1); });
+    it('spurious proof', function () { expect(err(db,0)).toEqual(['afile',14,'scanner','spurious-proof']); });
+});
+
+describe('spurious proof 2:', function () {
+    var db;
+    beforeAll(function () { db = mmom.Scanner.parseSync('afile','   foo $p x $= y $= z $.'); });
+    it('has 1 segments', function () { expect(db.segments.length).toBe(1); });
+    it('first is discarded', function () { expect(seg2(db,0)).toEqual([mmom.Segment.BOGUS,'   foo $p x $= y $= z $.',['x'],['y','z'],'foo']); });
+    it('has 1 errors', function () { expect(db.scanErrors.length).toBe(1); });
+    it('spurious proof', function () { expect(err(db,0)).toEqual(['afile',17,'scanner','spurious-proof']); });
+});
+
+describe('stray $. w/o label:', function () {
+    var db;
+    beforeAll(function () { db = mmom.Scanner.parseSync('afile','$.'); });
+    it('has 1 segments', function () { expect(db.segments.length).toBe(1); });
+    it('first is $f', function () { expect(seg2(db,0)).toEqual([mmom.Segment.BOGUS,'$.',null,null,null]); });
+    it('has 1 errors', function () { expect(db.scanErrors.length).toBe(1); });
+    it('spurious period', function () { expect(err(db,0)).toEqual(['afile',0,'scanner','spurious-period']); });
+});
+
+describe('stray $. w/ label:', function () {
+    var db;
+    beforeAll(function () { db = mmom.Scanner.parseSync('afile','foo $.'); });
+    it('has 1 segments', function () { expect(db.segments.length).toBe(1); });
+    it('first is $f', function () { expect(seg2(db,0)).toEqual([mmom.Segment.BOGUS,'foo $.',null,null,'foo']); });
+    it('has 1 errors', function () { expect(db.scanErrors.length).toBe(1); });
+    it('spurious period', function () { expect(err(db,0)).toEqual(['afile',4,'scanner','spurious-period']); });
 });
