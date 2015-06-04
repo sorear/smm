@@ -159,3 +159,86 @@ describe('comment spanning include:', function () {
     it('loose $) error', function () { expect(err(db,1)).toEqual(['afile',17,'scanner','loose-comment-end']); });
     it('spurious label error', function () { expect(err(db,2)).toEqual(['afile',19,'scanner','spurious-label']); });
 });
+
+describe('nested comment:', function () {
+    var db;
+    beforeAll(function () { db = mmom.Scanner.parseSync('afile','$( foo $( bar $)'); });
+    it('has one segment', function () { expect(db.segments.length).toBe(1); });
+    it('first is comment', function () { expect(seg(db,0)).toEqual([mmom.Segment.COMMENT,'$( foo $( bar $)',null,null]); });
+    it('has one error', function () { expect(db.scanErrors.length).toBe(1); });
+    it('nested comment error', function () { expect(err(db,0)).toEqual(['afile',7,'scanner','nested-comment']); });
+});
+
+describe('bad characters in comment:', function () {
+    var db;
+    beforeAll(function () { db = mmom.Scanner.parseSync('afile','$( \u001f \u007f $)'); });
+    it('has 2 errors', function () { expect(db.scanErrors.length).toBe(2); });
+    it('bad character (too low)', function () { expect(err(db,0)).toEqual(['afile',3,'scanner','bad-character']); });
+    it('bad character (too high)', function () { expect(err(db,1)).toEqual(['afile',5,'scanner','bad-character']); });
+});
+
+describe('token with bad characters skipped', function () {
+    var db;
+    beforeAll(function () { db = mmom.Scanner.parseSync('afile','$c a b\u001fc d $.'); });
+    it('segment count', function () { expect(db.segments.length).toBe(1); });
+    it('bad token skipped', function () { expect(seg(db,0)).toEqual([mmom.Segment.CONST,'$c a b\u001fc d $.',['a','d'],null]); });
+    it('has 1 error', function () { expect(db.scanErrors.length).toBe(1); });
+    it('bad character', function () { expect(err(db,0)).toEqual(['afile',5,'scanner','bad-character']); });
+});
+
+describe('not a nested comment:', function () {
+    var db;
+    beforeAll(function () { db = mmom.Scanner.parseSync('afile','$( x$( $a $q $)'); });
+    it('has one segment', function () { expect(db.segments.length).toBe(1); });
+    it('first is comment', function () { expect(seg(db,0)).toEqual([mmom.Segment.COMMENT,'$( x$( $a $q $)',null,null]); });
+    it('has no error', function () { expect(db.scanErrors.length).toBe(0); });
+});
+
+describe('false comment end:', function () {
+    var db;
+    beforeAll(function () { db = mmom.Scanner.parseSync('afile','$( x$)x $)'); });
+    it('has one segment', function () { expect(db.segments.length).toBe(1); });
+    it('first is comment', function () { expect(seg(db,0)).toEqual([mmom.Segment.COMMENT,'$( x$)x $)',null,null]); });
+    it('has 1 error', function () { expect(db.scanErrors.length).toBe(1); });
+    it('false comment end', function () { expect(err(db,0)).toEqual(['afile',3,'scanner','pseudo-comment-end']); });
+});
+
+describe('unterminated directive:', function () {
+    var db;
+    beforeAll(function () { db = mmom.Scanner.parseSync('afile','$['); });
+    it('has one segment', function () { expect(db.segments.length).toBe(1); });
+    it('first is EOF (uninterpreted)', function () { expect(seg(db,0)).toEqual([mmom.Segment.EOF,'$[',null,null]); });
+    it('has 1 error', function () { expect(db.scanErrors.length).toBe(1); });
+    it('EOF in directive', function () { expect(err(db,0)).toEqual(['afile',2,'scanner','unterminated-directive']); });
+});
+
+describe('bad/missing filename:', function () {
+    var db;
+    beforeAll(function () { db = mmom.Scanner.parseSync('afile','$[ $foo $]'); });
+    it('has one segment', function () { expect(db.segments.length).toBe(1); });
+    it('first is EOF (uninterpreted)', function () { expect(seg(db,0)).toEqual([mmom.Segment.EOF,'$[ $foo $]',null,null]); });
+    it('has 2 errors', function () { expect(db.scanErrors.length).toBe(2); });
+    it('bad filename', function () { expect(err(db,0)).toEqual(['afile',3,'scanner','dollar-in-filename']); });
+    it('missing valid filename', function () { expect(err(db,1)).toEqual(['afile',8,'scanner','missing-filename']); });
+});
+
+describe('two tokens in include:', function () {
+    var db;
+    beforeAll(function () { db = mmom.Scanner.parseSync('afile','$[ afile bfile $]'); });
+    it('has one segment', function () { expect(db.segments.length).toBe(1); });
+    it('first is include (extra token ignored)', function () { expect(seg(db,0)).toEqual([mmom.Segment.INCLUDE,'$[ afile bfile $]',null,null]); });
+    it('has 1 error', function () { expect(db.scanErrors.length).toBe(1); });
+    it('bad filename', function () { expect(err(db,0)).toEqual(['afile',9,'scanner','directive-too-long']); });
+});
+
+describe('attempt to span file end with directive', function () {
+    var db;
+    beforeAll(function () { db = mmom.Scanner.parseSync('afile',new Map().set('afile','$[ bfile $] $]').set('bfile','$[ cfile')); });
+    it('has three segments', function () { expect(db.segments.length).toBe(3); });
+    it('first is include', function () { expect(seg(db,0)).toEqual([mmom.Segment.INCLUDE,'$[ bfile $]',null,null]); });
+    it('second is uninterpretable', function () { expect(seg(db,1)).toEqual([mmom.Segment.EOF,'$[ cfile',null,null]); });
+    it('third is uninterpretable', function () { expect(seg(db,2)).toEqual([mmom.Segment.EOF,' $]',null,null]); });
+    it('has 2 errors', function () { expect(db.scanErrors.length).toBe(2); });
+    it('unterminated directive', function () { expect(err(db,0)).toEqual(['bfile',8,'scanner','unterminated-directive']); });
+    it('loose directive end', function () { expect(err(db,1)).toEqual(['afile',12,'scanner','loose-directive-end']); });
+});

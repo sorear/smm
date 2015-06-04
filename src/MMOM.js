@@ -194,7 +194,15 @@ MMScanner.prototype.getToken = function () {
     while (ix < len && " \t\r\f\n".indexOf(str[ix]) >= 0) ix++;
     this.token_start = start = ix;
     while (ix < len && " \t\r\f\n".indexOf(chr = str[ix]) < 0) {
-        if (chr < ' ' || chr > '~') this.addError('bad-character');
+        if (chr < ' ' || chr > '~') {
+            this.addError('bad-character');
+            // skip this token entirely...
+            ix++;
+            while (ix < len && " \t\r\f\n".indexOf(chr = str[ix]) < 0) ix++;
+            while (ix < len && " \t\r\f\n".indexOf(chr = str[ix]) >= 0) ix++;
+            this.token_start = start = ix;
+            continue;
+        }
         ix++;
     }
 
@@ -393,7 +401,7 @@ MMScanner.prototype.scan = function () {
                     this.newSegment();
                 }
                 else {
-                    this.addError('spurious-period');
+                    this.addError('spurious-period'); // IDLE or LABEL
                     this.segment.type = MMSegment.BOGUS;
                     this.newSegment();
                 }
@@ -401,21 +409,17 @@ MMScanner.prototype.scan = function () {
                 break;
 
             case '$=':
-                if ((state !== S_MATH || this.segment.type !== MMSegment.PROVABLE) && this.segment.type !== MMSegment.BOGUS) {
+                if (state !== S_MATH || !this.segment.proof) {
                     this.addError('spurious-proof');
                     this.segment.type = MMSegment.BOGUS;
                 }
-                state = S_PROOF;
-                this.segment.proof = [];
-                this.segment.proofPos = [];
-                break;
-
-            case '$[':
-                this.addError('include-unsupported');
+                else {
+                    state = S_PROOF;
+                }
                 break;
 
             case '$]':
-                this.addError('include-unsupported');
+                this.addError('loose-directive-end');
                 break;
 
             case '$a':
@@ -461,7 +465,7 @@ MMScanner.prototype.scan = function () {
                 }
                 else {
                     if (state === S_LABEL) this.addError('spurious-label');
-                    this.label = null;
+                    this.segment.label = null;
                     this.segment.startPos = [this.source, this.token_start];
                 }
 
@@ -480,6 +484,10 @@ MMScanner.prototype.scan = function () {
                     state = S_MATH;
                     this.segment.math = [];
                     this.segment.mathPos = [];
+                    if (token === '$p') { // allocate a proof segment even if the segment type was forced to BOGUS due to missing label
+                        this.segment.proofPos = [];
+                        this.segment.proof = [];
+                    }
                 }
                 break;
 
