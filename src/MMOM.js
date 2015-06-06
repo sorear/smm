@@ -444,6 +444,7 @@ MMScanner.prototype.scan = function () {
                     break;
                 }
 
+                // less than ideal because the keyword gets boxed into the last segment.  should ideally back up the previous by a statement or two
                 if (state === S_MATH) {
                     this.addError('nonterminated-math');
                     this.newSegment();
@@ -499,7 +500,7 @@ MMScanner.prototype.scan = function () {
 
                 if (state === S_IDLE) {
                     if (/[^-_.0-9a-zA-Z]/.test(token))
-                        this.addError('invalid-label');
+                        this.addError('invalid-label'); // currently still allow into DOM
                     this.segment.label = token;
                     this.segment.startPos = [this.source, this.token_start];
                     state = S_LABEL;

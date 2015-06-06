@@ -1,6 +1,9 @@
 var mmom = require('../src/MMOM.js');
 var db;
-function src(x) { beforeAll(function () { db = mmom.Scanner.parseSync('afile',x); }); }
+function src(x) {
+    if (typeof x === 'object' && !(x instanceof Map)) { x = new Map(Object.keys(x).map(function (k) { return [k,x[k]]; })); }
+    beforeAll(function () { db = mmom.Scanner.parseSync('afile',x); });
+}
 function deep(x) { console.log(require('util').inspect(x,{depth:null,colors:true})); }
 function err(db,i) { var e = db.scanErrors[i]; return e ? [ e.source.name, e.offset, e.category, e.code ] : []; }
 function seg(db,i) { var e = db.segments[i]; return e ? [ e.type, e.raw, e.math, e.proof ] : []; }
@@ -10,6 +13,16 @@ function errs(es) {
     it(`has ${es.length} errors`, function () { expect(db.scanErrors.length).toBe(es.length); });
     es.forEach(function (e,ix) {
         it(`error ${ix}: ${e[3]}`, function () { expect(err(db,ix)).toEqual(e); });
+    });
+}
+
+function segs(ss) {
+    it(`has ${ss.length} segments`, function () { expect(db.segments.length).toBe(ss.length); });
+    ss.forEach(function (s,ix) {
+        it(`segment ${ix}=${s.typ}`, function () { expect(seg2(db,ix)).toEqual([mmom.Segment[s.typ],s.raw,s.mat,s.prf,s.lbl]); });
+        if (s.stp) { it(`segment ${ix}/startPos`, function () { expect(pos(db,ix,'startPos')).toEqual(s.stp); }); }
+        if (s.map) { it(`segment ${ix}/mathPos`, function () { expect(pos(db,ix,'mathPos')).toEqual(s.map); }); }
+        if (s.prp) { it(`segment ${ix}/proofPos`, function () { expect(pos(db,ix,'proofPos')).toEqual(s.prp); }); }
     });
 }
 
@@ -292,4 +305,106 @@ describe('stray $. w/ label:', function () {
     it('has 1 segments', function () { expect(db.segments.length).toBe(1); });
     it('first is $f', function () { expect(seg2(db,0)).toEqual([mmom.Segment.BOGUS,'foo $.',null,null,'foo']); });
     errs([ ['afile',4,'scanner','spurious-period'] ]);
+});
+
+var cases = [
+    {
+        tag: "mid-statement file switch",
+        src: { "afile": "$c a $[ bfile $] c $.", "bfile": "b $( sss $)" },
+        seg: [
+            { typ: 'CONST', raw: "$c a $[ bfile $]b $( sss $) c $.", mat: ['a','b','c'], prf: null, lbl: null, map: ['afile',3,'bfile',0,'afile',17] },
+        ],
+        err: []
+    },
+    {
+        tag: "missing $. on math",
+        src: 'foo $a x y $c z $.',
+        seg: [
+            { typ: 'AXIOM', raw: 'foo $a x y $c', mat: ['x','y'], lbl: 'foo', prf: null },
+            { typ: 'CONST', raw: ' z $.', mat: ['z'], lbl: null, prf: null },
+        ],
+        err: [['afile',11,'scanner','nonterminated-math']],
+    },
+    {
+        tag: "missing $. on math/$p",
+        src: 'foo $p x y $c z $.',
+        seg: [
+            { typ: 'PROVABLE', raw: 'foo $p x y $c', mat: ['x','y'], lbl: 'foo', prf: [] },
+            { typ: 'CONST', raw: ' z $.', mat: ['z'], lbl: null, prf: null },
+        ],
+        err: [['afile',11,'scanner','nonterminated-math']],
+    },
+    {
+        tag: "missing $. on proof",
+        src: 'foo $p x y $= w $c z $.',
+        seg: [
+            { typ: 'PROVABLE', raw: 'foo $p x y $= w $c', mat: ['x','y'], lbl: 'foo', prf: ['w'] },
+            { typ: 'CONST', raw: ' z $.', mat: ['z'], lbl: null, prf: null },
+        ],
+        err: [['afile',16,'scanner','nonterminated-proof']],
+    },
+    {
+        tag: "missing label on $a->BOGUS",
+        src: '$a x y $.',
+        seg: [
+            { typ: 'BOGUS', raw: '$a x y $.', mat: ['x','y'], lbl: null, prf: null },
+        ],
+        err: [['afile',0,'scanner','missing-label']],
+    },
+    {
+        tag: "missing label on $p incomplete->BOGUS",
+        src: '$p x y $.',
+        seg: [
+            { typ: 'BOGUS', raw: '$p x y $.', mat: ['x','y'], lbl: null, prf: [] },
+        ],
+        err: [['afile',0,'scanner','missing-label']],
+    },
+    {
+        tag: "missing label on $p complete->BOGUS",
+        src: '$p x y $= z $.',
+        seg: [
+            { typ: 'BOGUS', raw: '$p x y $= z $.', mat: ['x','y'], lbl: null, prf: ['z'] },
+        ],
+        err: [['afile',0,'scanner','missing-label']],
+    },
+    {
+        tag: "spurious label",
+        src: 'foo ${',
+        seg: [
+            { typ: 'OPEN', raw: 'foo ${', mat: null, lbl: null, prf: null },
+        ],
+        err: [['afile',4,'scanner','spurious-label']],
+    },
+    {
+        tag: "keyword-like entity",
+        src: '$x $}',
+        seg: [
+            { typ: 'CLOSE', raw: '$x $}', mat: null, lbl: null, prf: null },
+        ],
+        err: [['afile',0,'scanner','pseudo-keyword']],
+    },
+    {
+        tag: "limited label charset",
+        src: '?? $a x y $.',
+        seg: [
+            { typ: 'AXIOM', raw: '?? $a x y $.', mat: ['x','y'], lbl: '??', prf: null },
+        ],
+        err: [['afile',0,'scanner','invalid-label']],
+    },
+    {
+        tag: "two labels",
+        src: 'foo bar $a x y $.',
+        seg: [
+            { typ: 'AXIOM', raw: 'foo bar $a x y $.', mat: ['x','y'], lbl: 'bar', prf: null, stp: ['afile',0] }, // second label, but start position is the start
+        ],
+        err: [['afile',4,'scanner','duplicate-label']],
+    },
+];
+
+cases.forEach(function(c) {
+    describe(`${c.tag}: `, function () {
+        src(c.src);
+        segs(c.seg);
+        errs(c.err);
+    });
 });
