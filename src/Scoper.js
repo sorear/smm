@@ -227,8 +227,10 @@ MMScoper.prototype.scan = function () {
                 break;
 
             case DV:
-                if (seg.math.length < 2)
+                if (seg.math.length < 2) {
                     this.addError(seg.startPos, 0, 'dv-short');
+                    break;
+                }
                 used = { __proto__: null };
                 for (var i = 0; i < seg.math.length; i++) {
                     if (seg.math[i] in used) {
