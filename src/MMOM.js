@@ -116,11 +116,12 @@ Object.defineProperty(MMSegment.prototype, 'raw', {
     }
 });
 
-function MMError(source, offset, category, code) {
+function MMError(source, offset, category, code, data) {
     this.source = source;
     this.offset = offset;
     this.category = category;
     this.code = code;
+    this.data = data;
 }
 
 MMSegment.EOF = 1;
