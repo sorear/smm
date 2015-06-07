@@ -124,6 +124,11 @@ function MMError(source, offset, category, code, data) {
     this.data = data;
 }
 
+MMError.prototype.toString = function() {
+    var pos = this.source.lookupPos(this.offset);
+    return `${this.source.name}:${pos[0]}:${pos[1]}:  ${this.code}`; // TODO add human versions, test
+};
+
 MMSegment.EOF = 1;
 MMSegment.COMMENT = 2;
 MMSegment.OPEN = 3;
