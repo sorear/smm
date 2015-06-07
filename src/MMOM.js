@@ -186,6 +186,8 @@ function MMScanner(root, resolver, sync) {
     this.token_start = 0;
 }
 
+var SP = []; while (SP.length < 33) SP.push(false); SP[32] = SP[9] = SP[13] = SP[12] = SP[10] = true;
+
 MMScanner.prototype.getToken = function () {
     var ix = this.index, str = this.source.text, len = this.length, start, chr;
 
@@ -197,15 +199,15 @@ MMScanner.prototype.getToken = function () {
         len = str.length;
     }
 
-    while (ix < len && " \t\r\f\n".indexOf(str[ix]) >= 0) ix++;
+    while (ix < len && (chr = str.charCodeAt(ix)) <= 32 && SP[chr]) ix++;
     this.token_start = start = ix;
-    while (ix < len && " \t\r\f\n".indexOf(chr = str[ix]) < 0) {
-        if (chr < ' ' || chr > '~') {
+    while (ix < len && ((chr = str.charCodeAt(ix)) > 32 || !SP[chr])) {
+        if (chr < 32 || chr > 126) {
             this.addError('bad-character');
             // skip this token entirely...
             ix++;
-            while (ix < len && " \t\r\f\n".indexOf(chr = str[ix]) < 0) ix++;
-            while (ix < len && " \t\r\f\n".indexOf(chr = str[ix]) >= 0) ix++;
+            while (ix < len && !SP[str.charCodeAt(ix)]) ix++;
+            while (ix < len && SP[str.charCodeAt(ix)]) ix++;
             this.token_start = start = ix;
             continue;
         }

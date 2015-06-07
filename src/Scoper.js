@@ -44,8 +44,8 @@ MMScoper.prototype.addError = function (pos,ix,code,data) {
 
 // note, even with invalid input we do not allow the symbol table to contain overlapping active ranges for $v/$f.  so it is only necessary to check the last math entry
 MMScoper.prototype.getSym = function (label) {
-    var symtab = this.symtab;
-    return symtab[label] || (symtab[label] = { labelled: -1, math: [], mathix: [], float: [] });
+    var symtab = this.symtab, r;
+    return symtab.get(label) || (symtab.set(label, r = { labelled: -1, math: [], mathix: [], float: [] }), r);
 };
 
 MMScoper.prototype.labelCheck = function (segix) {
@@ -82,10 +82,10 @@ MMScoper.prototype.mathCheck = function (segix) {
         return;
     }
 
-    checked = { __proto__: null };
+    checked = new Set();
     for (i = 0; i < seg.math.length; i++) {
-        if (seg.math[i] in checked) continue;
-        checked[seg.math[i]] = true;
+        if (checked.has(seg.math[i])) continue;
+        checked.add(seg.math[i]);
 
         sym = this.getSym(seg.math[i]);
 
@@ -116,7 +116,7 @@ MMScoper.prototype.scan = function () {
     var i, j;
     this.errors = [];
     var ends_chains_ary = this.ends_chains_ary = new Int32Array(segments.length); // chain for edap, end for fv
-    this.symtab = { __proto__: null };
+    this.symtab = new Map();
     var used;
     var sym;
 
@@ -231,13 +231,13 @@ MMScoper.prototype.scan = function () {
                     this.addError(seg.startPos, 0, 'dv-short');
                     break;
                 }
-                used = { __proto__: null };
+                used = new Map();
                 for (var i = 0; i < seg.math.length; i++) {
-                    if (seg.math[i] in used) {
-                        this.addError(seg.mathPos, i, 'dv-repeated', { prev: this.getPos(seg.mathPos, used[seg.math[i]]) });
+                    if (used.has(seg.math[i])) {
+                        this.addError(seg.mathPos, i, 'dv-repeated', { prev: this.getPos(seg.mathPos, used.get(seg.math[i])) });
                         continue;
                     }
-                    used[seg.math[i]] = i;
+                    used.set(seg.math[i],i);
                     sym = this.getSym(seg.math[i]);
                     if (sym.math.length && segments[sym.math[sym.math.length - 1]].type === VAR && ends_chains_ary[sym.math[sym.math.length - 1]] === HIGHSEG) {
                         // active $v
