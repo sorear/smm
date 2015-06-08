@@ -26,6 +26,8 @@ function MMVerifyState(verify, segix, use_abr) {
     this.segments = verify.db.segments;
     this.frame = this.scoper.getFrame(segix);
     this.seg = this.segments[segix];
+    this.var2flag = new Map();
+    this.flag2var = [];
     this.segix = segix;
     this.errors = [];
     this.aframes = verify.aframes;
@@ -68,6 +70,18 @@ MMVerifyState.prototype.check = function (i, label) {
     if (!oframe.hasFrame) {
         if (oframe.ix >= this.segix || this.scoper.ends_ary[oframe.ix] < this.segix)
             return this.errors = [this.proofError(i,'inactive-hyp')];
+
+        // only explicitly referenced $e/$f hyps can contribute to the variable universe in this proof
+        oframe.mandVars.forEach(function (v) {
+            if (!this.var2flag || this.var2flag.has(v)) return;
+            if (this.flag2var.length === 32) {
+                this.var2flag = null;
+                return;
+            }
+
+            this.flag2var.push(v);
+            this.var2flag.set(v, 1 << this.var2flag.size);
+        }, this);
     }
     else {
         if (oframe.ix >= this.segix)
@@ -93,8 +107,17 @@ MMVerifyState.prototype.recall = function (i) {
 };
 
 MMVerifyState.prototype.getVars = function (math) {
-    var that = this;
-    return new Set(math.filter(function (m) { return that.varSyms.has(m); }));
+    if (this.var2flag) {
+        var out = 0, k;
+        for (var k = 0; k < math.length; k++) {
+            if (this.var2flag.has(math[k]))
+                out |= this.var2flag.get(math[k]);
+        }
+        return out;
+    }
+    else {
+        return new Set(math.filter(function (m) { return this.varSyms.has(m); }, this));
+    }
 };
 
 var FAST_BAILOUT = new Error();
@@ -115,13 +138,23 @@ MMVerifyState.prototype.substify = function (subst, math) {
 
 // note that, while set.mm has 400 vars, the _vast_ majority of proofs use fewer than 32 of them, so an opportunistic bitfield version would probably be a huge win
 MMVerifyState.prototype.substifyVars = function (substVars, math) {
-    var out = new Set();
-    var done = new Set();
-    var k;
-    for (k = 0; k < math.length; k++) {
-        if (substVars.has(math[k]) && !done.has(math[k])) {
-            substVars.get(math[k]).forEach(function (mm) { out.add(mm); });
-            done.add(math[k]);
+    var out,done,k;
+    if (this.var2flag) {
+        out = 0;
+        for (k = 0; k < math.length; k++) {
+            if (substVars.has(math[k])) {
+                out |= substVars.get(math[k]);
+            }
+        }
+    }
+    else {
+        out = new Set();
+        done = new Set();
+        for (k = 0; k < math.length; k++) {
+            if (substVars.has(math[k]) && !done.has(math[k])) {
+                substVars.get(math[k]).forEach(function (mm) { out.add(mm); });
+                done.add(math[k]);
+            }
         }
     }
     return out;
@@ -188,16 +221,34 @@ MMVerifyState.prototype.step = function (i, label) {
         }
 
         // check DVs
-        var that = this;
-        for (j = 0; j < oframe.mandDv.length; j += 2) {
-            substVars.get(oframe.mandDv[j]).forEach(function (v1) {
-                var dv1 = that.frame.dv.get(v1);
-                substVars.get(oframe.mandDv[j+1]).forEach(function (v2) {
-                    if (!dv1 || !dv1.has(v2)) {
-                        that.errors.push(that.proofError(i, 'dv-violation'));
+        if (this.var2flag) {
+            var dvm1, dvm2, dvi1, dvi2, dvs1;
+            for (j = 0; j < oframe.mandDv.length; j += 2) {
+                dvm1 = substVars.get(oframe.mandDv[j]);
+                for (dvi1 = 0; dvi1 < 32; dvi1++) {
+                    if (!(dvm1 & (1 << dvi1))) continue;
+                    dvs1 = this.frame.dv.get(this.flag2var[dvi1]);
+                    dvm2 = substVars.get(oframe.mandDv[j+1]);
+                    for (dvi2 = 0; dvi2 < 32; dvi2++) {
+                        if (!(dvm2 & (1 << dvi2))) continue;
+                        if (!dvs1 || !dvs1.has(this.flag2var[dvi2])) {
+                            this.errors.push(this.proofError(i, 'dv-violation'));
+                        }
                     }
-                });
-            });
+                }
+            }
+        }
+        else {
+            for (j = 0; j < oframe.mandDv.length; j += 2) {
+                substVars.get(oframe.mandDv[j]).forEach(function (v1) {
+                    var dv1 = this.frame.dv.get(v1);
+                    substVars.get(oframe.mandDv[j+1]).forEach(function (v2) {
+                        if (!dv1 || !dv1.has(v2)) {
+                            this.errors.push(this.proofError(i, 'dv-violation'));
+                        }
+                    }, this);
+                }, this);
+            }
         }
         if (this.errors.length) return this.errors;
 
@@ -274,6 +325,8 @@ MMVerifyState.prototype.checkProof = function () {
     else {
         for (i = 0; i < proof.length; i++) {
             if (this.check(i, proof[i])) return this.errors;
+        }
+        for (i = 0; i < proof.length; i++) {
             if (this.step(i, proof[i])) return this.errors;
         }
     }

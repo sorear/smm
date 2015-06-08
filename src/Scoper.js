@@ -289,21 +289,21 @@ function MMFrame(scoper, ix) {
     this.errors = [];
     this.target = seg.math.slice(1);
     this.ttype = seg.math[0];
-    this.hasFrame = true;
+    this.hasFrame = true; // if false, only mandVars, target, ttype are valid
     this.ix = ix;
 
     // errors should only happen here if there were errors during scan(), but you went to verify a proof anyway
     if (!seg.math.length)
         this.errors.push(new mmom.Error(seg.startPos[0], seg.startPos[1], 'frame-builder', 'empty-math'));
 
-    if (seg.type !== AXIOM && seg.type !== PROVABLE) {
-        this.hasFrame = false;
-        return;
-    }
-
     for (k = 1; k < seg.math.length; k++) {
         tok = seg.math[k];
         if (scoper.varSyms.has(tok)) this.mandVars.add(tok);
+    }
+
+    if (seg.type !== AXIOM && seg.type !== PROVABLE) {
+        this.hasFrame = false;
+        return;
     }
 
     for (j = scoper.chains_ary[ix]; j >= 0; j = scoper.chains_ary[j]) {
