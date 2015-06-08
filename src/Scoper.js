@@ -290,6 +290,7 @@ function MMFrame(scoper, ix) {
     this.target = seg.math.slice(1);
     this.ttype = seg.math[0];
     this.hasFrame = true;
+    this.ix = ix;
 
     // errors should only happen here if there were errors during scan(), but you went to verify a proof anyway
     if (!seg.math.length)

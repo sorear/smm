@@ -6,6 +6,7 @@ define(['./MMOM','./ABRStringStore','./Scoper'], function (mmom,ABRStringStore,S
 function MMVerifyStandard(db) {
     this.db = db;
     this.scoper = Scoper.install(db);
+    this.aframes = new Map();
 }
 
 MMVerifyStandard.install = function (db) {
@@ -27,7 +28,8 @@ function MMVerifyState(verify, segix, use_abr) {
     this.seg = this.segments[segix];
     this.segix = segix;
     this.errors = [];
-    this.aframes = new Map();
+    this.aframes = verify.aframes;
+    this.checked = new Set();
     this.mathStack = [];
     this.mathSave = [];
     this.varStack = [];
@@ -46,26 +48,32 @@ MMVerifyState.prototype.check = function (i, label) {
     var sym, aseg, oframe;
     if (label === '?') return;
 
-    sym = this.scoper.getSym(label);
+    if (this.aframes.has(label)) {
+        oframe = this.aframes.get(label);
+    }
+    else {
+        sym = this.scoper.getSym(label);
 
-    if (!sym || sym.labelled < 0) {
-        return this.errors = [this.proofError(i,'no-such-assertion')];
+        if (!sym || sym.labelled < 0) {
+            return this.errors = [this.proofError(i,'no-such-assertion')];
+        }
+
+        aseg = this.segments[sym.labelled];
+        oframe = this.scoper.getFrame(sym.labelled);
+        this.aframes.set(label, oframe);
     }
 
-    aseg = this.segments[sym.labelled];
-    oframe = this.scoper.getFrame(sym.labelled);
     if (oframe.errors.length) return this.errors = oframe.errors;
 
     if (!oframe.hasFrame) {
-        if (sym.labelled >= this.segix || this.scoper.ends_ary[sym.labelled] < this.segix)
+        if (oframe.ix >= this.segix || this.scoper.ends_ary[oframe.ix] < this.segix)
             return this.errors = [this.proofError(i,'inactive-hyp')];
     }
     else {
-        if (sym.labelled >= this.segix)
+        if (oframe.ix >= this.segix)
             return this.errors = [this.proofError(i,'not-yet-proved')];
     }
-
-    this.aframes.set(label, oframe);
+    this.checked.add(label);
 };
 
 MMVerifyState.prototype.save = function () {
@@ -224,7 +232,7 @@ MMVerifyState.prototype.checkProof = function () {
             if (i >= proof.length) return [this.proofError(-1,'compression-nonterm')];
             if (proof[i] === ')') break;
             if (proof[i] === '?') return [this.proofError(i,'compression-dummy-in-roster')];
-            if (this.aframes.has(proof[i])) return [this.proofError(i,'compression-redundant-roster')];
+            if (this.checked.has(proof[i])) return [this.proofError(i,'compression-redundant-roster')];
             preload.push(proof[i]);
             if (this.check(i, proof[i])) return this.errors;
         }
