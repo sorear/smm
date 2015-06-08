@@ -47,6 +47,7 @@ var cases = [
     { name: '$d ok const', src: '$c x y z $. $v 0 1 $. f $f x 0 $. g $f x 1 $. ${ $d 0 1 $. h $a y 0 1 $. $} i $a x z $. test $p y 1 z $= g i h $.', errs: [] },
     { name: '$d ok pass', src: '$c x y z $. $v 0 1 $. f $f x 0 $. g $f x 1 $. ${ $d 0 1 $. h $a y 0 1 $. $} i $a x z $. ${ $d 0 1 $. test $p y 1 0 $= g f h $. $}', errs: [] },
     { name: '$d not ok eq', src: '$c x y z $. $v 0 1 $. f $f x 0 $. g $f x 1 $. ${ $d 0 1 $. h $a y 0 1 $. $} i $a x z $. ${ $d 0 1 $. test $p y 1 1 $= g g h $. $}', errs: [['afile',122,'verify','dv-violation']] },
+    { name: 'simplest compressed', src: '$c x $. y $a x $. test $p x $= ( y ) A $.', errs: [] },
 ];
 
 cases.forEach(function (cc) {

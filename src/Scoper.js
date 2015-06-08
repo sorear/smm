@@ -289,13 +289,16 @@ function MMFrame(scoper, ix) {
     this.errors = [];
     this.target = seg.math.slice(1);
     this.ttype = seg.math[0];
+    this.hasFrame = true;
 
     // errors should only happen here if there were errors during scan(), but you went to verify a proof anyway
     if (!seg.math.length)
         this.errors.push(new mmom.Error(seg.startPos[0], seg.startPos[1], 'frame-builder', 'empty-math'));
 
-    if (segments[ix].type !== AXIOM && segments[ix].type !== PROVABLE)
-        throw new Error('can only fetch frame for $a/$p');
+    if (seg.type !== AXIOM && seg.type !== PROVABLE) {
+        this.hasFrame = false;
+        return;
+    }
 
     for (k = 1; k < seg.math.length; k++) {
         tok = seg.math[k];
@@ -314,7 +317,7 @@ function MMFrame(scoper, ix) {
                 tok = segments[j].math[k];
                 if (scoper.varSyms.has(tok)) this.mandVars.add(tok);
             }
-            this.mand.push({ float: false, logic: true, type: segments[j].math[0], variable: null, goal: segments[j].math.slice(1), sort: j });
+            this.mand.push({ float: false, logic: true, type: segments[j].math[0], variable: null, goal: segments[j].math.slice(1), stmt: j });
         }
         else {
             dv_ix.push(j);
@@ -350,10 +353,10 @@ function MMFrame(scoper, ix) {
             throw "can't happen";
         }
 
-        this.mand.push({ float: true, logic: false, type: segments[j].math[0], variable: segments[j].math[1], goal: null, sort: j });
+        this.mand.push({ float: true, logic: false, type: segments[j].math[0], variable: segments[j].math[1], goal: null, stmt: j });
     }
 
-    this.mand.sort(function (a,b) { return a.sort - b.sort; });
+    this.mand.sort(function (a,b) { return a.stmt - b.stmt; });
 
     for (j = 0; j < dv_ix.length; j++) {
         math = segments[dv_ix[j]].math;
