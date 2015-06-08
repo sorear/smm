@@ -19,12 +19,12 @@ MMVerifyStandard.prototype.proofError = function (seg, i, code, data) {
 
 function __array(set) { var a=[]; set.forEach(function(v) { a.push(v); }); return a; }
 
-MMVerifyStandard.prototype.verify = function (segix) {
+MMVerifyStandard.prototype.verify = function (segix, use_abr) {
     var frame = this.scoper.getFrame(segix);
     var seg = this.db.segments[segix];
     var proof = seg.proof;
     var i, mathStack = [], typeStack = [], varStack = [], depth = 0;
-    var abr = new ABRStringStore();
+    var abr = use_abr ? new ABRStringStore() : null;
     var incomplete = false;
     var varSyms = this.scoper.varSyms;
     var that=this, errors = [];
@@ -85,13 +85,13 @@ MMVerifyStandard.prototype.verify = function (segix) {
         }
 
         function substify(math) {
-            var out = abr.emptyString;
+            var out = use_abr ? abr.emptyString : '';
             for (var k = 0; k < math.length; k++) {
                 if (subst.has(math[k])) {
-                    out = abr.concat(out, subst.get(math[k]));
+                    out = use_abr ? abr.concat(out, subst.get(math[k])) : out + subst.get(math[k]);
                 }
                 else {
-                    out = abr.concat(out, abr.singleton(math[k]));
+                    out = use_abr ? abr.concat(out, abr.singleton(math[k])) : out + math[k] + ' ';
                 }
             }
             return out;
@@ -122,7 +122,7 @@ MMVerifyStandard.prototype.verify = function (segix) {
 
         if (!oframe.hasFrame) {
             typeStack[depth] = oframe.ttype;
-            mathStack[depth] = abr.fromArray(oframe.target);
+            mathStack[depth] = use_abr ? abr.fromArray(oframe.target) : oframe.target.map(function (x) { return x + ' '; }).join('');
             varStack[depth] = getVars(oframe.target); //Extract variables from this
             depth++;
         }
@@ -161,7 +161,7 @@ MMVerifyStandard.prototype.verify = function (segix) {
                     if (mand.type !== typeStack[depth + j]) {
                         return errors = [that.proofError(seg,i,'type-mismatch')];
                     }
-                    if (!abr.equal(substify(mand.goal), mathStack[depth + j])) {
+                    if (substify(mand.goal) !== mathStack[depth + j]) {
                         return errors = [that.proofError(seg,i,'math-mismatch')];
                     }
                 }
@@ -258,7 +258,7 @@ MMVerifyStandard.prototype.verify = function (segix) {
             return [this.proofError(seg,-1,'done-bad-type')];
         }
 
-        if (!abr.equal(mathStack[0], abr.fromArray(seg.math.slice(1)))) {
+        if (mathStack[0] !== (use_abr ? abr.fromArray(seg.math.slice(1)) : seg.math.slice(1).map(function (x) { return x + ' '; }).join(''))) {
             return [this.proofError(seg,-1,'done-bad-math')];
         }
     }
