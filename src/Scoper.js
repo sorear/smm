@@ -297,6 +297,11 @@ function MMFrame(scoper, ix) {
     if (segments[ix].type !== AXIOM && segments[ix].type !== PROVABLE)
         throw new Error('can only fetch frame for $a/$p');
 
+    for (k = 1; k < seg.math.length; k++) {
+        tok = seg.math[k];
+        if (scoper.varSyms.has(tok)) this.mandVars.add(tok);
+    }
+
     for (j = scoper.chains_ary[ix]; j >= 0; j = scoper.chains_ary[j]) {
         if (segments[j].type === ESSEN) {
             essen_ix.push(j);
@@ -305,7 +310,7 @@ function MMFrame(scoper, ix) {
                 continue;
             }
             // capture mandatory variables
-            for (k = 1; i < segments[j].math.length; k++) {
+            for (k = 1; k < segments[j].math.length; k++) {
                 tok = segments[j].math[k];
                 if (scoper.varSyms.has(tok)) this.mandVars.add(tok);
             }

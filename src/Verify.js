@@ -17,6 +17,8 @@ MMVerifyStandard.prototype.proofError = function (seg, i, code, data) {
     return new mmom.Error(seg.proofPos[2*i+0], seg.proofPos[2*i+1], 'verify', code, data);
 };
 
+function __array(set) { var a=[]; set.forEach(function(v) { a.push(v); }); return a; }
+
 MMVerifyStandard.prototype.verify = function (segix) {
     var frame = this.scoper.getFrame(segix);
     var seg = this.db.segments[segix];
@@ -70,6 +72,7 @@ MMVerifyStandard.prototype.verify = function (segix) {
     // the proof syntax is not self-synchronizing, so for the most part it doesn't make sense to continue
     STEP: for (i = 0; i < proof.length; i++) {
         label = proof[i];
+        //console.log(`before step ${i} (${label}):`,typeStack.slice(0,depth).map(function (t,ix) { return `[${t}@${__array(varStack[ix]).join('+')}@ ${abr.toArray(mathStack[ix]).join(' ')}]`; }).join(' '));
         if (label === '?') {
             typeStack[depth] = varStack[depth] = mathStack[depth] = null;
             depth++;
@@ -87,9 +90,9 @@ MMVerifyStandard.prototype.verify = function (segix) {
         if (!aseg.math.length) return [this.proofError(seg,i,'malformed-referent')]; //bail if corrupt
 
         if (aseg.type === mmom.Segment.ESSEN || aseg.type === mmom.Segment.FLOAT) {
-            if (sym.labelled >= segix || this.scoper.ends_chains_ary[sym.labelled] < segix)
+            if (sym.labelled >= segix || this.scoper.ends_ary[sym.labelled] < segix)
                 return [this.proofError(seg,i,'inactive-hyp')];
-            typeStack[depth] = aseg.math[0] || '$';
+            typeStack[depth] = aseg.math[0];
             mathStack[depth] = abr.fromArray(aseg.math.slice(1));
             varStack[depth] = getVars(aseg.math.slice(1)); //Extract variables from this
             depth++;
