@@ -7,13 +7,16 @@ define(['./MMOM'], function (mmom) {
 
 function MMScoper(db) {
     this.db = db;
-    this.ends_chains_ary = null;
+    this.ends_ary = null;
+    this.chains_ary = null;
     this.errors = null;
     this.symtab = null;
+    this.varSyms = null;
+    this.scan();
 }
 
 MMScoper.install = function (db) {
-    return db.plugins.scoper = new MMScoper(db);
+    return db.plugins.scoper || (db.plugins.scoper = new MMScoper(db));
 };
 
 // track for:
@@ -66,7 +69,7 @@ MMScoper.prototype.labelCheck = function (segix) {
     sym.labelled = segix;
 };
 
-var HIGHSEG = -1 >>> 1;
+var HIGHSEG = MMScoper.HIGHSEG = -1 >>> 1;
 // MM files larger than 2GB are likely to cause no end of problems...
 
 MMScoper.prototype.mathCheck = function (segix) {
@@ -74,7 +77,7 @@ MMScoper.prototype.mathCheck = function (segix) {
 
     var segtab = this.db.segments;
     var seg = segtab[segix];
-    var ends_chains_ary = this.ends_chains_ary;
+    var ends_ary = this.ends_ary;
     var i, sym, checked;
 
     if (seg.math.length === 0) {
@@ -89,7 +92,7 @@ MMScoper.prototype.mathCheck = function (segix) {
 
         sym = this.getSym(seg.math[i]);
 
-        if (!sym.math.length || ends_chains_ary[sym.math[sym.math.length - 1]] !== HIGHSEG) {
+        if (!sym.math.length || ends_ary[sym.math[sym.math.length - 1]] !== HIGHSEG) {
             this.addError(seg.mathPos, i, 'eap-not-active-sym');
             continue;
         }
@@ -100,7 +103,7 @@ MMScoper.prototype.mathCheck = function (segix) {
                 // can only get away with this impurity because it's first
             }
 
-            if (!sym.float.length || ends_chains_ary[sym.float[sym.float.length - 1]] !== HIGHSEG) {
+            if (!sym.float.length || ends_ary[sym.float[sym.float.length - 1]] !== HIGHSEG) {
                 this.addError(seg.mathPos, i, 'eap-no-active-float');
             }
         }
@@ -115,8 +118,10 @@ MMScoper.prototype.scan = function () {
     var open_stack = [];
     var i, j;
     this.errors = [];
-    var ends_chains_ary = this.ends_chains_ary = new Int32Array(segments.length); // chain for edap, end for fv
+    var ends_ary = this.ends_ary = new Int32Array(segments.length); // efcv (always HIGHSEG for c)
+    var chains_ary = this.chains_ary = new Int32Array(segments.length); // edap
     this.symtab = new Map();
+    this.varSyms = new Set();
     var used;
     var sym;
 
@@ -136,7 +141,7 @@ MMScoper.prototype.scan = function () {
                 // pop stacks, set end numbers for statements above new close stack top, restore e/d chain
                 if (scope_ed_stack.length) {
                     while ((i = open_vf_stack.pop()) >= 0) {
-                        ends_chains_ary[i] = segix;
+                        ends_ary[i] = segix;
                     }
                     open_ed_ptr = scope_ed_stack.pop();
                     open_stack.pop();
@@ -151,7 +156,7 @@ MMScoper.prototype.scan = function () {
                     this.addError(seg.startPos, 0, 'const-empty');
                 if (scope_ed_stack.length)
                     this.addError(seg.startPos, 0, 'const-not-top-scope');
-                ends_chains_ary[segix] = HIGHSEG;
+                ends_ary[segix] = HIGHSEG;
                 // error if not top scope
                 for (i = 0; i < seg.math.length; i++) {
                     sym = this.getSym(seg.math[i]);
@@ -174,18 +179,19 @@ MMScoper.prototype.scan = function () {
             case VAR:
                 if (seg.math.length === 0)
                     this.addError(seg.startPos, 0, 'var-empty');
-                ends_chains_ary[segix] = HIGHSEG;
+                ends_ary[segix] = HIGHSEG;
                 for (i = 0; i < seg.math.length; i++) {
                     sym = this.getSym(seg.math[i]);
                     if (sym.labelled >= 0) {
                         this.addError(seg.mathPos, i, 'label-then-var', { prev: this.getPos(segments[sym.labelled].startPos, 0) });
                     }
 
-                    if (sym.math.length && ends_chains_ary[sym.math[sym.math.length - 1]] === HIGHSEG) {
+                    if (sym.math.length && ends_ary[sym.math[sym.math.length - 1]] === HIGHSEG) {
                         // still active
                         this.addError(seg.mathPos, i, 'math-then-var', { prev: this.getPos(segments[sym.math[sym.math.length - 1]].mathPos, sym.mathix[sym.math.length - 1]) });
                     }
                     else {
+                        this.varSyms.add(seg.math[i]);
                         // add math token
                         sym.math.push(segix);
                         sym.mathix.push(i);
@@ -197,29 +203,31 @@ MMScoper.prototype.scan = function () {
             case ESSEN:
                 this.labelCheck(segix);
                 this.mathCheck(segix);
-                ends_chains_ary[segix] = open_ed_ptr;
+                chains_ary[segix] = open_ed_ptr;
+                ends_ary[segix] = HIGHSEG;
+                open_vf_stack.push(segix);
                 open_ed_ptr = segix;
                 break;
 
             case FLOAT:
                 this.labelCheck(segix);
                 open_vf_stack.push(segix);
-                ends_chains_ary[segix] = HIGHSEG;
+                ends_ary[segix] = HIGHSEG;
                 if (seg.math.length !== 2) {
                     this.addError(seg.startPos, 0, 'float-format');
                     break;
                 }
                 sym = this.getSym(seg.math[0]);
-                if (!sym.math.length || ends_chains_ary[sym.math[sym.math.length - 1]] !== HIGHSEG || segments[sym.math[sym.math.length - 1]].type !== CONST) {
+                if (!sym.math.length || ends_ary[sym.math[sym.math.length - 1]] !== HIGHSEG || segments[sym.math[sym.math.length - 1]].type !== CONST) {
                     this.addError(seg.mathPos, 0, 'float-not-active-const');
                     break;
                 }
                 sym = this.getSym(seg.math[1]);
-                if (!sym.math.length || ends_chains_ary[sym.math[sym.math.length - 1]] !== HIGHSEG || segments[sym.math[sym.math.length - 1]].type !== VAR) {
+                if (!sym.math.length || ends_ary[sym.math[sym.math.length - 1]] !== HIGHSEG || segments[sym.math[sym.math.length - 1]].type !== VAR) {
                     this.addError(seg.mathPos, 1, 'float-not-active-var');
                     break;
                 }
-                if (sym.float.length && ends_chains_ary[sym.float[sym.float.length - 1]] === HIGHSEG) {
+                if (sym.float.length && ends_ary[sym.float[sym.float.length - 1]] === HIGHSEG) {
                     this.addError(seg.mathPos, 1, 'float-active-float', { prev: this.getPos(segments[sym.float[sym.float.length - 1]].startPos, 0) });
                     break;
                 }
@@ -239,7 +247,7 @@ MMScoper.prototype.scan = function () {
                     }
                     used.set(seg.math[i],i);
                     sym = this.getSym(seg.math[i]);
-                    if (sym.math.length && segments[sym.math[sym.math.length - 1]].type === VAR && ends_chains_ary[sym.math[sym.math.length - 1]] === HIGHSEG) {
+                    if (sym.math.length && segments[sym.math[sym.math.length - 1]].type === VAR && ends_ary[sym.math[sym.math.length - 1]] === HIGHSEG) {
                         // active $v
                     }
                     else {
@@ -247,7 +255,7 @@ MMScoper.prototype.scan = function () {
                     }
                 }
                 // add to e/d chain
-                ends_chains_ary[segix] = open_ed_ptr;
+                chains_ary[segix] = open_ed_ptr;
                 open_ed_ptr = segix;
                 break;
 
@@ -255,7 +263,7 @@ MMScoper.prototype.scan = function () {
             case PROVABLE:
                 this.labelCheck(segix);
                 this.mathCheck(segix);
-                ends_chains_ary[segix] = open_ed_ptr;
+                chains_ary[segix] = open_ed_ptr;
                 break;
         }
     }
@@ -266,12 +274,109 @@ MMScoper.prototype.scan = function () {
     }
 };
 
-function MMFrame() {
+function MMFrame(scoper, ix) {
+    var segments = scoper.db.segments;
+    var seg = segments[ix];
+    var math;
+    var essen_ix = [];
+    var dv_ix = [];
+    var j, k, l, tok, sym;
+
+    this.mand = [];
+    this.mandDv = [];
+    this.dv = new Map();
+    this.mandVars = new Set();
+    this.errors = [];
+    this.target = seg.math.slice(1);
+    this.ttype = seg.math[0];
+
+    // errors should only happen here if there were errors during scan(), but you went to verify a proof anyway
+    if (!seg.math.length)
+        this.errors.push(new mmom.Error(seg.startPos[0], seg.startPos[1], 'frame-builder', 'empty-math'));
+
+    if (segments[ix].type !== AXIOM && segments[ix].type !== PROVABLE)
+        throw new Error('can only fetch frame for $a/$p');
+
+    for (j = scoper.chains_ary[ix]; j >= 0; j = scoper.chains_ary[j]) {
+        if (segments[j].type === ESSEN) {
+            essen_ix.push(j);
+            if (!segments[j].math.length) {
+                this.errors.push(new mmom.Error(seg.startPos[0], seg.startPos[1], 'frame-builder', 'empty-hyp'));
+                continue;
+            }
+            // capture mandatory variables
+            for (k = 1; i < segments[j].math.length; k++) {
+                tok = segments[j].math[k];
+                if (scoper.varSyms.has(tok)) this.mandVars.add(tok);
+            }
+            this.mand.push({ float: false, logic: true, type: segments[j].math[0], variable: null, goal: segments[j].math.slice(1), sort: j });
+        }
+        else {
+            dv_ix.push(j);
+        }
+    }
+
+    for (tok of this.mandVars) {
+        sym = scoper.getSym(tok);
+
+        if (!sym || !sym.float.length) {
+            this.errors.push(new mmom.Error(seg.startPos[0], seg.startPos[1], 'frame-builder', 'no-float'));
+            continue;
+        }
+
+        j = 0; k = sym.float.length;
+        while (k - j > 1) {
+            l = (j + k) >>> 1;
+            if (ix >= sym.float[l]) {
+                j = l;
+            }
+            else {
+                k = l;
+            }
+        }
+
+        j = sym.float[j];
+
+        if (segments[j].type !== FLOAT || j >= ix || ix >= scoper.ends_ary[j]) {
+            this.errors.push(new mmom.Error(seg.startPos[0], seg.startPos[1], 'frame-builder', 'inactive-float'));
+            continue;
+        }
+        if (!segments[j].math.length) {
+            throw "can't happen";
+        }
+
+        this.mand.push({ float: true, logic: false, type: segments[j].math[0], variable: segments[j].math[1], goal: null, sort: j });
+    }
+
+    this.mand.sort(function (a,b) { return a.sort - b.sort; });
+
+    for (j = 0; j < dv_ix.length; j++) {
+        math = segments[dv_ix[j]].math;
+
+        for (k = 0; k < math.length; k++) {
+            if (!this.dv.has(math[k])) this.dv.set(math[k], new Set());
+        }
+
+        for (k = 0; k < math.length; k++) {
+            for (l = 0; l < math.length; l++) {
+                if (math[k] > math[l] && !this.dv.get(math[k]).has(math[l])) {
+                    this.dv.get(math[k]).add(math[l]);
+                    this.dv.get(math[l]).add(math[k]);
+                    if (this.mandVars.has(math[k]) && this.mandVars.has(math[l])) {
+                        this.mandDv.push(math[k], math[l]);
+                    }
+                }
+            }
+        }
+    }
+
+    // mand[{float,logic,type,variable,goal}]
+    // mandDv
+    // dv
 }
 
-MMScoper.prototype.getFrame = function (seg) {
-    // walk chain to find relevant $e/$d
-    // use indices to find relevant $f
+MMScoper.prototype.getFrame = function (ix) {
+    return new MMFrame(this, ix);
 };
 
 return MMScoper;

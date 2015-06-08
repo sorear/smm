@@ -1,0 +1,115 @@
+Requirements extracted from metamath.pdf
+
+4.1.1 #1 A metamath database MUST contain only characters from [\t\r\n\f !-~].
+4.1.1 #2 A metamath database MUST consist of tokens (${, $}, $(, $), $c, $v, $e, $f, $a, $p, $d, $=, $., $[, $], math tokens /[^$]+/, label tokens /[-_.0-9A-Za-z]+/) separated by white space (/[ \f\t\r\n]+/)
+Erratum: This appears to suggest that whitespace before the first token or after the last token is forbidden
+Erratum: This appears to forbid tokens in comments that contain $ but are not a valid keyword, such as $( $t $)
+
+4.1.2 #1 A comment MUST be bracketed by the $( and $) tokens
+4.1.2 #2 A comment MUST NOT contain the character sequences $( or $), but MAY contain any other printable characters
+Erratum: Does this imply that $( and $) are illegal even within tokens?
+NYI: We check for $) mid-token, but $( only as a token
+Erratum: This explicitly permits $( $t $), contradicting 4.1.1#2
+4.1.2 #3 A file inclusion command MUST consist of a file name (math token) bracketed by $[ $] tokens
+Erratum: Interaction with comments and file boundaries unspecified; email suggests only allowing between statements at top level scope
+4.1.2 #4 A file inclusion command MUST be replaced with the file contents
+Erratum: This could be interpreted as token gluing semantics
+Erratum: Name resolution unspecified.  Forum requests current-file-relative
+4.1.2 #5 Inclusions of a file other than the first MUST be ignored
+Erratum: This appears to require stat() functionality to handle multiple references to multiple names of a single file (links, case insensitivity)
+NYI: we have no filename resolver, and assume repeat includes only by nominal equality.
+
+4.1.3 #1 After removing comments and splicing includes, the database MUST consist of syntactically valid statements
+4.1.3 #2 ${ and $} must pair up, and are statements
+4.1.3 #3 $v and $c MUST be followed by one or more math tokens, then $.
+4.1.3 #4 $v and $c MUST NOT declare the same token twice in one statement
+4.1.3 #5 A variable token MAY NOT be declared with a $v when it is already active
+4.1.3 #6 A variable token MAY be declared again after it has gone out of scope
+4.1.3 #7 A constant MUST be declared in the top-level scope
+4.1.3 #8 A constant MAY NOT be declared more than once
+4.1.3 #9 $f statements MUST look like label $f active-const active-var $.
+4.1.3 #10 $e MUST look like label $e active-const [0 or more active-math] $.
+4.1.3 #11 Simple $d MUST look like $d active-var active-var $.  Compound $d MUST look like $d [3 or more var] $.
+Erratum: compound $d does not require active
+4.1.3 #12 All variables in a $d must be distinct.
+4.1.3 #13 $a MUST look like label $a active-const [0 or more active-math] $.
+4.1.3 #14 $p MUST look like label $p active-const [0 or more active-math] $= "sequence of labels" $.
+Erratum: number of labels not specified.
+Erratum: ( ) ? are not valid labels, but must be allowed in a proof
+4.1.3 #15 Two $f for the same variable MUST NOT be simultaneously active.
+4.1.3 #16 Each variable in EAP MUST exist in an active $f.
+4.1.3 #17 Two statements MAY NOT have the same label.
+4.1.3 #18 A string MAY NOT be used as a math token and label in the same database.
+
+4.1.4 #1 Each label in a proof MUST be an active statement other than that under proof
+4.1.4 #2 An active hypothesis MUST push its expression onto a stack
+4.1.4 #3 For an assertion, there MUST be a (unique) substitution causing the assertion's mandatory hyps to match the top N items of the stack, which are popped and replaced with the assertion.
+4.1.4 #4 After processing proof, stack MUST contain one entry which MUST match $p assertion
+4.1.4 #5 Proofs MAY contain ? (4.4.5) or be in compressed format (B)
+4.1.4 #6 For each mandatory $d X Y $. in the frame of an assertion referenced in a proof, for each variable A in the expression subsituted for X, for each variable B in the expression subsituted for Y, A and B MUST not be the same and there MUST be an active $d A B $.
+
+4.2.7
+Errratum: The frame discussion implies that $d requires $f, but there is nothing corresponding in 4.1.x
+
+4.4.1 #1 Within a comment, ` (but not ``) MUST toggle math mode.
+Erratum: #8 indicates it is OK to not close
+4.4.1 #2 `` MUST be treated as `.
+4.4.1 #3 Outside math mode, ~~ MUST output ~
+4.4.1 #4 Outside math mode, ~ MUST treat all characters until the next whitespace as a statement label
+Erratum: "~ foo" appears to gather foo, while the spec says it should gather nada
+4.4.1 #5 In math mode, input MUST consist of tokens surrounded by white space
+4.4.1 #6 Tokens SHOULD be present in $t (warning)
+4.4.1 #7 Tokens in $t SHOULD be $c/$v declared (warning); no activity check
+4.4.1 #8 Math mode MUST end at the end of comment
+4.4.1 #9 `` delimiters SHOULD be whitespace bracketed
+
+4.4.2 #1 ~URL MUST generate a link to URL, which must start with http://; ~~ should replace ~ in URL
+4.4.2 #2 [Author] - bibref, see 5.8.1 and 5.8.3
+4.4.2 #3 $t MUST flag comment as typeset, see 5.8.1
+4.4.2 #4 Text from space_notspace MUST be italicized until notspace_space.  "Normal punctuation" MUST be ignored
+Erratum: Does italic end at comment end?
+Erratum: What is normal punctuation exactly?
+4.4.2 #5 nonspace_nonspace MUST cause nonspace and some following text to become a subscript
+Erratum: How much, exactly?
+4.4.2 #6 ~ and ` SHOULD be bracketed with whitespace
+4.4.2 #7 Spaces around ~` MUST be automatically removed for "normal rules of punctuation"
+Erratum: Which are?  ` foo `_( bar ) is mentioned
+4.4.2 #8 Bibrefs MUST be keyword label noise-word? [author] p. number
+Erratum: What is the syntax of an author?  Are numbers integers?
+4.4.2 #9 Noise-word MAY be: of in from on
+4.4.2 #10 Keyword MAY be:      theorem lemma definition compare proposition corollary axiom rule remark exercise problem notation example property figure postulate equation scheme chapter
+4.4.2 #11 Label MAY be zero or more words not noise-word or keyword.
+
+4.4.3 #1 Comments MAY appear inside $[ $] (comment removal first)
+
+4.4.5 #1 ? MAY appear in a proof, and acts as a wildcard hypothesis
+
+5.8.1 #1 There MUST NOT be more than one $t comment
+5.8.1 #2 Variables htmldir, althtmldir, htmltitle, htmlhome, htmlvarcolors, htmlbibliography MAY be set
+5.8.1 #3 htmldef, althtmldef MAY be used equivalently to latexdef
+Errata: exthtml{title,home,label,bibliography}
+
+A #1 There MAY be a comment starting with $t
+Erratum: Should specify token
+Erratum: Can there be >1 $t comment?
+A #2 Contents of $t MUST consist of $t-statements
+Erratum: Whitespace between statements?
+A #3 "latexdef" statment MUST look like <latexdef ws token-string ws as latex-string ws? ;>
+A #4 "latexdef" SHOULD be on line start
+A #5 Strings MUST be one or more string-parts separated by [ws + ws]
+Erratum: Whitespace optional? HELP HTML says no
+A #6 String-parts MUST be "..." or '...', MUST NOT span lines, SQL/Pascal quoting rule (double the quoter)
+
+B #1 A compressed proof MUST look like ( [0 or more label] ) [0 or more tokens matching /[A-Z?]+/
+Question: May labels be repeated?
+B #2 The "body" MUST consist of integers in split base 20/5 and Z? entities.  Whitespace MAY be added anywhere, even within integers.
+B #3 Integers MUST be coded as A..T,UA..UT,VA..VT,..,YA..YT,UUA..UUT,..
+B #4 Z MAY be placed after the A..T of a proof step to flag reuse
+Question: Appears to forbid Z after ? or Z
+B #5 Mandatory hypotheses and statments in the label list MAY be referenced with sequentially assigned numbers
+B #6 Each Z MAY be referenced by a new sequential number.
+B #7 A statement in the statement list MUST NOT refer to a mandatory hypothesis
+B #8 Z must precede uses
+B #9 ? is allowed
+
+From MM online help:

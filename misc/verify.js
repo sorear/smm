@@ -10,7 +10,7 @@ db.scanErrors.forEach(function(e) {
     process.stdout.write(e.toString() + "\n", 'utf8');
 });
 time_1 = Date.now();
-Scoper.install(db).scan();
+Scoper.install(db);
 time_2 = Date.now();
 process.stdout.write(`scope ${time_2 - time_1} ms\n`,'utf8');
 db.plugins.scoper.errors.forEach(function(e) {

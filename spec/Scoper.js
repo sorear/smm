@@ -5,7 +5,7 @@ function src(x) {
     beforeAll(function () {
         db = mmom.Scanner.parseSync('afile',x);
         if (db.scanErrors.length) throw new Error('unexpected scan errors in scoper pass');
-        Scoper.install(db).scan();
+        Scoper.install(db);
     });
 }
 function deep(x) { console.log(require('util').inspect(x,{depth:null,colors:true})); }
@@ -347,7 +347,7 @@ var cases = [
 ];
 
 cases.forEach(function (cc) {
-    describe(`${cc.name}: `, function () {
+    describe(`${cc.name}:`, function () {
         src(cc.src);
         errs(cc.errs);
     });
