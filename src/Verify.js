@@ -3,6 +3,18 @@ if (typeof define !== 'function') { var define = require('amdefine')(module) }
 define(['./MMOM','./ABRStringStore','./Scoper'], function (mmom,ABRStringStore,Scoper) {
 'use strict';
 
+var hists={};
+function sample(name,val) {
+    if (!hists[name]) {
+        hists[name] = new Map();
+        process.nextTick(function () {
+            console.log(name, hists[name]);
+            delete hists[name];
+        });
+    }
+    hists[name].set(val, 1 + (hists[name].get(val) || 0));
+}
+
 function MMVerifyStandard(db) {
     this.db = db;
     this.scoper = Scoper.install(db);
@@ -84,7 +96,6 @@ MMVerifyState.prototype.check = function (i, label) {
             if (!this.use_bitfield_dv || this.var2flag.has(v)) break;
             if (this.flag2var.length === 32) {
                 this.use_bitfield_dv = false;
-                break;
             }
 
             this.flag2var.push(v);
@@ -188,16 +199,21 @@ MMVerifyState.prototype.step = function (i, label) {
     oframe = this.aframes.get(label);
 
     if (!oframe.hasFrame) {
+        //sample('ef/ap',0);
         this.typeStack[this.depth] = oframe.ttype;
         this.mathStack[this.depth] = this.use_abr ? this.abr.fromArray(oframe.target) : oframe.target.map(function (x) { return x + ' '; }).join('');
         this.varStack[this.depth] = this.getVars(oframe.target); //Extract variables from this
         this.depth++;
     }
     else {
+        //sample('ef/ap',1);
         if (oframe.mand.length > this.depth)
             return this.errors = [this.proofError(i,'stack-underflow')];
 
         this.depth -= oframe.mand.length;
+        //sample('arg',oframe.mand.length);
+        //sample('avar',oframe.mandVars.length);
+        //sample('adv',oframe.mandDv.length/2);
 
         subst = [];
         substVars = [];
@@ -283,6 +299,7 @@ MMVerifyState.prototype.checkProof = function () {
 
     var frame = this.frame;
     if (frame.errors.length) return frame.errors;
+    //sample('hyp',frame.mand.length);
 
     // the proof syntax is not self-synchronizing, so for the most part it doesn't make sense to continue
     if (proof.length && proof[0] === '(') {
@@ -301,6 +318,7 @@ MMVerifyState.prototype.checkProof = function () {
             preload.push(proof[i]);
             if (this.check(i, proof[i])) return this.errors;
         }
+        //sample('ovar',this.flag2var.length);
 
         i++;
         for (; i < proof.length; i++) {
@@ -341,6 +359,7 @@ MMVerifyState.prototype.checkProof = function () {
         for (i = 0; i < proof.length; i++) {
             if (this.check(i, proof[i])) return this.errors;
         }
+        //sample('ovar',this.flag2var.length);
         for (i = 0; i < proof.length; i++) {
             if (this.step(i, proof[i])) return this.errors;
         }
@@ -371,6 +390,7 @@ MMVerifyStandard.prototype.verify = function (segix) {
     try {
         return (new MMVerifyState(this, segix, false)).checkProof();
     } catch (e) {
+        //sample('abr',1);
         if (e === FAST_BAILOUT) {
             return (new MMVerifyState(this, segix, true)).checkProof();
         }
