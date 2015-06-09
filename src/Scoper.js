@@ -274,6 +274,33 @@ MMScoper.prototype.scan = function () {
     }
 };
 
+// pre-optimize a math string for 'substify' (non-ABR mode only)
+function cook_substify(scoper, math) {
+    var out = [''];
+    for (var i = 1; i < math.length; i++) {
+        if (scoper.varSyms.has(math[i])) {
+            out.push(math[i]);
+            out.push('');
+        }
+        else {
+            out[out.length - 1] += (math[i] + ' ');
+        }
+    }
+    return out;
+}
+
+function cook_substify_vars(scoper, math) {
+    var used = new Set();
+    var out = [];
+    for (var i = 1; i < math.length; i++) {
+        if (scoper.varSyms.has(math[i]) && !used.has(math[i])) {
+            used.add(math[i]);
+            out.push(math[i]);
+        }
+    }
+    return out;
+}
+
 function MMFrame(scoper, ix) {
     var segments = scoper.db.segments;
     var seg = segments[ix];
@@ -288,6 +315,8 @@ function MMFrame(scoper, ix) {
     this.mandVars = new Set();
     this.errors = [];
     this.target = seg.math.slice(1);
+    this.target_s = cook_substify(scoper, seg.math);
+    this.target_v = cook_substify_vars(scoper, seg.math);
     this.ttype = seg.math[0];
     this.hasFrame = true; // if false, only mandVars, target, ttype are valid
     this.ix = ix;
@@ -318,7 +347,7 @@ function MMFrame(scoper, ix) {
                 tok = segments[j].math[k];
                 if (scoper.varSyms.has(tok)) this.mandVars.add(tok);
             }
-            this.mand.push({ float: false, logic: true, type: segments[j].math[0], variable: null, goal: segments[j].math.slice(1), stmt: j });
+            this.mand.push({ float: false, logic: true, type: segments[j].math[0], variable: null, goal: segments[j].math.slice(1), goal_s: cook_substify(scoper, segments[j].math), stmt: j });
         }
         else {
             dv_ix.push(j);
@@ -354,7 +383,7 @@ function MMFrame(scoper, ix) {
             throw "can't happen";
         }
 
-        this.mand.push({ float: true, logic: false, type: segments[j].math[0], variable: segments[j].math[1], goal: null, stmt: j });
+        this.mand.push({ float: true, logic: false, type: segments[j].math[0], variable: segments[j].math[1], goal: null, goal_s: null, stmt: j });
     }
 
     this.mand.sort(function (a,b) { return a.stmt - b.stmt; });

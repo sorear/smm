@@ -129,18 +129,30 @@ MMVerifyState.prototype.getVars = function (math) {
 
 var FAST_BAILOUT = new Error();
 
-MMVerifyState.prototype.substify = function (subst, math) {
-    var out = this.use_abr ? this.abr.emptyString : '';
-    for (var k = 0; k < math.length; k++) {
-        if (subst.has(math[k])) {
-            out = this.use_abr ? this.abr.concat(out, subst.get(math[k])) : out + subst.get(math[k]);
+MMVerifyState.prototype.substify = function (subst, math, math_s) {
+    var out, k;
+    if (this.use_abr) {
+        out = this.abr.emptyString;
+        for (k = 0; k < math.length; k++) {
+            if (subst.has(math[k])) {
+                out = this.abr.concat(out, subst.get(math[k]));
+            }
+            else {
+                out = this.abr.concat(out, this.abr.singleton(math[k]));
+            }
         }
-        else {
-            out = this.use_abr ? this.abr.concat(out, this.abr.singleton(math[k])) : out + math[k] + ' ';
-        }
-        if (!this.use_abr && out.length > 1000000) throw FAST_BAILOUT;
+        return out;
     }
-    return out;
+    else {
+        out = '';
+        for (k = 0; ; k += 2) {
+            out = out + math_s[k];
+            if (out.length > 1000000) throw FAST_BAILOUT;
+            if (k + 1 >= math_s.length) break;
+            out = out + subst.get(math_s[k+1]);
+        }
+        return out;
+    }
 };
 
 // note that, while set.mm has 400 vars, the _vast_ majority of proofs use fewer than 32 of them, so an opportunistic bitfield version would probably be a huge win
@@ -149,19 +161,13 @@ MMVerifyState.prototype.substifyVars = function (substVars, math) {
     if (this.use_bitfield_dv) {
         out = 0;
         for (k = 0; k < math.length; k++) {
-            if (substVars.has(math[k])) {
-                out |= substVars.get(math[k]);
-            }
+            out |= substVars.get(math[k]);
         }
     }
     else {
         out = new Set();
-        done = new Set();
         for (k = 0; k < math.length; k++) {
-            if (substVars.has(math[k]) && !done.has(math[k])) {
-                substVars.get(math[k]).forEach(function (mm) { out.add(mm); });
-                done.add(math[k]);
-            }
+            substVars.get(math[k]).forEach(function (mm) { out.add(mm); });
         }
     }
     return out;
@@ -221,7 +227,7 @@ MMVerifyState.prototype.step = function (i, label) {
                 if (mand.type !== this.typeStack[this.depth + j]) {
                     return this.errors = [this.proofError(i,'type-mismatch')];
                 }
-                if (this.substify(subst, mand.goal) !== this.mathStack[this.depth + j]) {
+                if (this.substify(subst, mand.goal, mand.goal_s) !== this.mathStack[this.depth + j]) {
                     return this.errors = [this.proofError(i,'math-mismatch')];
                 }
             }
@@ -260,8 +266,8 @@ MMVerifyState.prototype.step = function (i, label) {
         if (this.errors.length) return this.errors;
 
         this.typeStack[this.depth] = oframe.ttype;
-        this.mathStack[this.depth] = this.substify(subst, oframe.target);
-        this.varStack[this.depth] = this.substifyVars(substVars, oframe.target);
+        this.mathStack[this.depth] = this.substify(subst, oframe.target, oframe.target_s);
+        this.varStack[this.depth] = this.substifyVars(substVars, oframe.target_v);
         this.depth++;
     }
 };
@@ -303,10 +309,10 @@ MMVerifyState.prototype.checkProof = function () {
                 if (ch >= 65 && ch <= 84) {
                     k = (k * 20) + (ch - 0x41);
                     if (k >= preload.length) {
-                        if (this.recall(k - preload.length)) return errors;
+                        if (this.recall(k - preload.length)) return this.errors;
                     }
                     else {
-                        if (this.step(-1,preload[k])) return errors;
+                        if (this.step(-1,preload[k])) return this.errors;
                     }
                     can_save = true;
                     k = 0;
