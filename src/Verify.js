@@ -280,7 +280,7 @@ MMVerifyState.prototype.checkProof = function () {
     // the proof syntax is not self-synchronizing, so for the most part it doesn't make sense to continue
     if (proof.length && proof[0] === '(') {
 
-        var i = 0, k = 0, ch, preload=[], can_save=false;
+        var i = 0, k = 0, j, ch, preload=[], chunk, can_save=false;
         for (i = 0; i < frame.mand.length; i++) {
             preload.push(this.segments[frame.mand[i].stmt].label);
             if (this.check(-1, preload[preload.length-1])) return this.errors;
@@ -295,36 +295,37 @@ MMVerifyState.prototype.checkProof = function () {
             if (this.check(i, proof[i])) return this.errors;
         }
 
-        var text = proof.slice(i+1).join('');
-
-        i = 0;
-        while (i < text.length) {
-            ch = text.charCodeAt(i++);
-            if (ch >= 65 && ch <= 84) {
-                k = (k * 20) + (ch - 0x41);
-                if (k >= preload.length) {
-                    if (this.recall(k - preload.length)) return errors;
+        i++;
+        for (; i < proof.length; i++) {
+            chunk = proof[i];
+            for (j = 0; j < chunk.length; j++) {
+                ch = chunk.charCodeAt(j);
+                if (ch >= 65 && ch <= 84) {
+                    k = (k * 20) + (ch - 0x41);
+                    if (k >= preload.length) {
+                        if (this.recall(k - preload.length)) return errors;
+                    }
+                    else {
+                        if (this.step(-1,preload[k])) return errors;
+                    }
+                    can_save = true;
+                    k = 0;
+                }
+                else if (ch >= 85 && ch <= 89) {
+                    k = (k * 5) + (ch - 84);
+                }
+                else if (ch === 90) {
+                    if (!can_save) return [this.proofError(-1,'compressed-cant-save-here')];
+                    this.save();
+                    can_save = false;
+                }
+                else if (ch === 63) {
+                    this.step(-1,'?');
+                    can_save = false;
                 }
                 else {
-                    if (this.step(-1,preload[k])) return errors;
+                    return [this.proofError(-1,'bad-compressed-char')];
                 }
-                can_save = true;
-                k = 0;
-            }
-            else if (ch >= 85 && ch <= 89) {
-                k = (k * 5) + (ch - 84);
-            }
-            else if (ch === 90) {
-                if (!can_save) return [this.proofError(-1,'compressed-cant-save-here')];
-                this.save();
-                can_save = false;
-            }
-            else if (ch === 63) {
-                this.step(-1,'?');
-                can_save = false;
-            }
-            else {
-                return [this.proofError(-1,'bad-compressed-char')];
             }
         }
         if (k) return [this.proofError(-1,'compressed-partial-integer')];
