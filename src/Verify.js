@@ -55,7 +55,7 @@ function MMVerifyState(verify, segix, use_abr) {
 }
 
 MMVerifyState.prototype.check = function (i, label) {
-    var sym, oframe;
+    var sym, oframe, i, v;
     if (label === '?') return;
 
     if (this.aframes.has(label)) {
@@ -79,16 +79,17 @@ MMVerifyState.prototype.check = function (i, label) {
             return this.errors = [this.proofError(i,'inactive-hyp')];
 
         // only explicitly referenced $e/$f hyps can contribute to the variable universe in this proof
-        oframe.mandVars.forEach(function (v) {
-            if (!this.use_bitfield_dv || this.var2flag.has(v)) return;
+        for (i = 0; i < oframe.mandVars.length; i++) {
+            v = oframe.mandVars[i];
+            if (!this.use_bitfield_dv || this.var2flag.has(v)) break;
             if (this.flag2var.length === 32) {
                 this.use_bitfield_dv = false;
-                return;
+                break;
             }
 
             this.flag2var.push(v);
             this.var2flag.set(v, 1 << this.var2flag.size);
-        }, this);
+        }
     }
     else {
         if (oframe.ix >= this.segix)
@@ -129,13 +130,13 @@ MMVerifyState.prototype.getVars = function (math) {
 
 var FAST_BAILOUT = new Error();
 
-MMVerifyState.prototype.substify = function (subst, math, math_s) {
+MMVerifyState.prototype.substify = function (subst, vmap, math, math_s) {
     var out, k;
     if (this.use_abr) {
         out = this.abr.emptyString;
         for (k = 0; k < math.length; k++) {
-            if (subst.has(math[k])) {
-                out = this.abr.concat(out, subst.get(math[k]));
+            if (vmap.has(math[k])) {
+                out = this.abr.concat(out, subst[vmap.get(math[k])]);
             }
             else {
                 out = this.abr.concat(out, this.abr.singleton(math[k]));
@@ -149,7 +150,7 @@ MMVerifyState.prototype.substify = function (subst, math, math_s) {
             out = out + math_s[k];
             if (out.length > 1000000) throw FAST_BAILOUT;
             if (k + 1 >= math_s.length) break;
-            out = out + subst.get(math_s[k+1]);
+            out = out + subst[math_s[k+1]];
         }
         return out;
     }
@@ -161,20 +162,20 @@ MMVerifyState.prototype.substifyVars = function (substVars, math) {
     if (this.use_bitfield_dv) {
         out = 0;
         for (k = 0; k < math.length; k++) {
-            out |= substVars.get(math[k]);
+            out |= substVars[math[k]];
         }
     }
     else {
         out = new Set();
         for (k = 0; k < math.length; k++) {
-            substVars.get(math[k]).forEach(function (mm) { out.add(mm); });
+            substVars[math[k]].forEach(function (mm) { out.add(mm); });
         }
     }
     return out;
 };
 
 MMVerifyState.prototype.step = function (i, label) {
-    var oframe, j, subst, substVars, mand;
+    var oframe, j, mand, subst, substVars;
 
     //console.log(`before step ${i} (${label}):`,typeStack.slice(0,this.depth).map(function (t,ix) { return `[${t}@${__array(varStack[ix]).join('+')}@ ${abr.toArray(mathStack[ix],null,20).join(' ')}]`; }).join(' '));
     if (label === '?') {
@@ -198,8 +199,8 @@ MMVerifyState.prototype.step = function (i, label) {
 
         this.depth -= oframe.mand.length;
 
-        subst = new Map();
-        substVars = new Map();
+        subst = [];
+        substVars = [];
         // build a subsitution using the $f statements
         for (j = 0; j < oframe.mand.length; j++) {
             mand = oframe.mand[j];
@@ -215,19 +216,19 @@ MMVerifyState.prototype.step = function (i, label) {
                     return this.errors = [this.proofError(i,'type-mismatch')];
                 }
 
-                subst.set(mand.variable, this.mathStack[this.depth + j]);
-                substVars.set(mand.variable, this.varStack[this.depth + j]);
+                subst[mand.ix] = this.mathStack[this.depth + j];
+                substVars[mand.ix] = this.varStack[this.depth + j];
             }
         }
 
         // check logical hyps, if provided
         for (j = 0; j < oframe.mand.length; j++) {
             mand = oframe.mand[j];
-            if (mand.logic && this.typeStack[this.depth + j]) {
+            if (!mand.float && this.typeStack[this.depth + j]) {
                 if (mand.type !== this.typeStack[this.depth + j]) {
                     return this.errors = [this.proofError(i,'type-mismatch')];
                 }
-                if (this.substify(subst, mand.goal, mand.goal_s) !== this.mathStack[this.depth + j]) {
+                if (this.substify(subst, oframe.mandVarsMap, mand.goal, mand.goal_s) !== this.mathStack[this.depth + j]) {
                     return this.errors = [this.proofError(i,'math-mismatch')];
                 }
             }
@@ -237,11 +238,11 @@ MMVerifyState.prototype.step = function (i, label) {
         if (this.use_bitfield_dv) {
             var dvm1, dvm2, dvi1, dvi2, dvs1;
             for (j = 0; j < oframe.mandDv.length; j += 2) {
-                dvm1 = substVars.get(oframe.mandDv[j]);
+                dvm1 = substVars[oframe.mandDv[j]];
                 for (dvi1 = 0; dvi1 < 32; dvi1++) {
                     if (!(dvm1 & (1 << dvi1))) continue;
                     dvs1 = this.frame.dv.get(this.flag2var[dvi1]);
-                    dvm2 = substVars.get(oframe.mandDv[j+1]);
+                    dvm2 = substVars[oframe.mandDv[j+1]];
                     for (dvi2 = 0; dvi2 < 32; dvi2++) {
                         if (!(dvm2 & (1 << dvi2))) continue;
                         if (!dvs1 || !dvs1.has(this.flag2var[dvi2])) {
@@ -253,9 +254,9 @@ MMVerifyState.prototype.step = function (i, label) {
         }
         else {
             for (j = 0; j < oframe.mandDv.length; j += 2) {
-                substVars.get(oframe.mandDv[j]).forEach(function (v1) {
+                substVars[oframe.mandDv[j]].forEach(function (v1) {
                     var dv1 = this.frame.dv.get(v1);
-                    substVars.get(oframe.mandDv[j+1]).forEach(function (v2) {
+                    substVars[oframe.mandDv[j+1]].forEach(function (v2) {
                         if (!dv1 || !dv1.has(v2)) {
                             this.errors.push(this.proofError(i, 'dv-violation'));
                         }
@@ -266,7 +267,7 @@ MMVerifyState.prototype.step = function (i, label) {
         if (this.errors.length) return this.errors;
 
         this.typeStack[this.depth] = oframe.ttype;
-        this.mathStack[this.depth] = this.substify(subst, oframe.target, oframe.target_s);
+        this.mathStack[this.depth] = this.substify(subst, oframe.mandVarsMap, oframe.target, oframe.target_s);
         this.varStack[this.depth] = this.substifyVars(substVars, oframe.target_v);
         this.depth++;
     }

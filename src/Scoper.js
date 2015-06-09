@@ -275,11 +275,11 @@ MMScoper.prototype.scan = function () {
 };
 
 // pre-optimize a math string for 'substify' (non-ABR mode only)
-function cook_substify(scoper, math) {
+function cook_substify(mandVarsMap, math) {
     var out = [''];
     for (var i = 1; i < math.length; i++) {
-        if (scoper.varSyms.has(math[i])) {
-            out.push(math[i]);
+        if (mandVarsMap.has(math[i])) {
+            out.push(mandVarsMap.get(math[i]));
             out.push('');
         }
         else {
@@ -289,13 +289,13 @@ function cook_substify(scoper, math) {
     return out;
 }
 
-function cook_substify_vars(scoper, math) {
+function cook_substify_vars(mandVarsMap, math) {
     var used = new Set();
     var out = [];
     for (var i = 1; i < math.length; i++) {
-        if (scoper.varSyms.has(math[i]) && !used.has(math[i])) {
+        if (mandVarsMap.has(math[i]) && !used.has(math[i])) {
             used.add(math[i]);
-            out.push(math[i]);
+            out.push(mandVarsMap.get(math[i]));
         }
     }
     return out;
@@ -307,19 +307,19 @@ function MMFrame(scoper, ix) {
     var math;
     var essen_ix = [];
     var dv_ix = [];
-    var j, k, l, tok, sym;
+    var i, j, k, l, tok, sym;
 
     this.mand = [];
     this.mandDv = [];
     this.dv = new Map();
-    this.mandVars = new Set();
+    this.mandVars = [];
     this.errors = [];
     this.target = seg.math.slice(1);
-    this.target_s = cook_substify(scoper, seg.math);
-    this.target_v = cook_substify_vars(scoper, seg.math);
     this.ttype = seg.math[0];
     this.hasFrame = true; // if false, only mandVars, target, ttype are valid
     this.ix = ix;
+
+    var mandVarsMap = this.mandVarsMap = new Map();
 
     // errors should only happen here if there were errors during scan(), but you went to verify a proof anyway
     if (!seg.math.length)
@@ -327,8 +327,13 @@ function MMFrame(scoper, ix) {
 
     for (k = 1; k < seg.math.length; k++) {
         tok = seg.math[k];
-        if (scoper.varSyms.has(tok)) this.mandVars.add(tok);
+        if (scoper.varSyms.has(tok) && !mandVarsMap.has(tok)) {
+            mandVarsMap.set(tok, this.mandVars.length);
+            this.mandVars.push(tok);
+        }
     }
+    this.target_v = cook_substify_vars(mandVarsMap, seg.math);
+    this.target_s = cook_substify(mandVarsMap, seg.math);
 
     if (seg.type !== AXIOM && seg.type !== PROVABLE) {
         this.hasFrame = false;
@@ -345,16 +350,20 @@ function MMFrame(scoper, ix) {
             // capture mandatory variables
             for (k = 1; k < segments[j].math.length; k++) {
                 tok = segments[j].math[k];
-                if (scoper.varSyms.has(tok)) this.mandVars.add(tok);
+                if (scoper.varSyms.has(tok) && !mandVarsMap.has(tok)) {
+                    mandVarsMap.set(tok, this.mandVars.length);
+                    this.mandVars.push(tok);
+                }
             }
-            this.mand.push({ float: false, logic: true, type: segments[j].math[0], variable: null, goal: segments[j].math.slice(1), goal_s: cook_substify(scoper, segments[j].math), stmt: j });
+            this.mand.push({ float: false, type: segments[j].math[0], ix: 0, goal: segments[j].math.slice(1), goal_s: cook_substify(mandVarsMap, segments[j].math), stmt: j });
         }
         else {
             dv_ix.push(j);
         }
     }
 
-    for (tok of this.mandVars) {
+    for (i = 0; i < this.mandVars.length; i++) {
+        tok = this.mandVars[i];
         sym = scoper.getSym(tok);
 
         if (!sym || !sym.float.length) {
@@ -383,7 +392,7 @@ function MMFrame(scoper, ix) {
             throw "can't happen";
         }
 
-        this.mand.push({ float: true, logic: false, type: segments[j].math[0], variable: segments[j].math[1], goal: null, goal_s: null, stmt: j });
+        this.mand.push({ float: true, type: segments[j].math[0], ix: i, goal: null, goal_s: null, stmt: j });
     }
 
     this.mand.sort(function (a,b) { return a.stmt - b.stmt; });
@@ -400,8 +409,8 @@ function MMFrame(scoper, ix) {
                 if (math[k] > math[l] && !this.dv.get(math[k]).has(math[l])) {
                     this.dv.get(math[k]).add(math[l]);
                     this.dv.get(math[l]).add(math[k]);
-                    if (this.mandVars.has(math[k]) && this.mandVars.has(math[l])) {
-                        this.mandDv.push(math[k], math[l]);
+                    if (mandVarsMap.has(math[k]) && mandVarsMap.has(math[l])) {
+                        this.mandDv.push(mandVarsMap.get(math[k]), mandVarsMap.get(math[l]));
                     }
                 }
             }
