@@ -24,7 +24,6 @@ function MMVerifyState(verify, segix, use_abr) {
     this.scoper = verify.scoper;
     this.verify = verify;
     this.segments = verify.db.segments;
-    this.frame = this.scoper.getFrame(segix);
     this.seg = this.segments[segix];
     this.var2flag = new Map();
     this.use_bitfield_dv = true;
@@ -32,6 +31,7 @@ function MMVerifyState(verify, segix, use_abr) {
     this.segix = segix;
     this.errors = [];
     this.aframes = verify.aframes;
+    this.frame = verify.aframes.get(segix);
     this.checked = new Set();
     this.mathStack = [];
     this.mathSave = [];
@@ -44,11 +44,18 @@ function MMVerifyState(verify, segix, use_abr) {
     this.varSyms = this.scoper.varSyms;
     this.use_abr = use_abr;
     this.abr = use_abr ? new ABRStringStore() : null;
+
+    if (!this.frame) {
+        this.frame = this.scoper.getFrame(segix); 
+        this.aframes.set(verify.db.segments[segix].label, this.frame);
+        this.aframes.set(segix, this.frame);
+    }
+
     Object.seal(this);
 }
 
 MMVerifyState.prototype.check = function (i, label) {
-    var sym, aseg, oframe;
+    var sym, oframe;
     if (label === '?') return;
 
     if (this.aframes.has(label)) {
@@ -61,7 +68,6 @@ MMVerifyState.prototype.check = function (i, label) {
             return this.errors = [this.proofError(i,'no-such-assertion')];
         }
 
-        aseg = this.segments[sym.labelled];
         oframe = this.scoper.getFrame(sym.labelled);
         this.aframes.set(label, oframe);
     }
