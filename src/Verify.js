@@ -27,6 +27,7 @@ function MMVerifyState(verify, segix, use_abr) {
     this.frame = this.scoper.getFrame(segix);
     this.seg = this.segments[segix];
     this.var2flag = new Map();
+    this.use_bitfield_dv = true;
     this.flag2var = [];
     this.segix = segix;
     this.errors = [];
@@ -73,9 +74,9 @@ MMVerifyState.prototype.check = function (i, label) {
 
         // only explicitly referenced $e/$f hyps can contribute to the variable universe in this proof
         oframe.mandVars.forEach(function (v) {
-            if (!this.var2flag || this.var2flag.has(v)) return;
+            if (!this.use_bitfield_dv || this.var2flag.has(v)) return;
             if (this.flag2var.length === 32) {
-                this.var2flag = null;
+                this.use_bitfield_dv = false;
                 return;
             }
 
@@ -107,7 +108,7 @@ MMVerifyState.prototype.recall = function (i) {
 };
 
 MMVerifyState.prototype.getVars = function (math) {
-    if (this.var2flag) {
+    if (this.use_bitfield_dv) {
         var out = 0, k;
         for (var k = 0; k < math.length; k++) {
             if (this.var2flag.has(math[k]))
@@ -139,7 +140,7 @@ MMVerifyState.prototype.substify = function (subst, math) {
 // note that, while set.mm has 400 vars, the _vast_ majority of proofs use fewer than 32 of them, so an opportunistic bitfield version would probably be a huge win
 MMVerifyState.prototype.substifyVars = function (substVars, math) {
     var out,done,k;
-    if (this.var2flag) {
+    if (this.use_bitfield_dv) {
         out = 0;
         for (k = 0; k < math.length; k++) {
             if (substVars.has(math[k])) {
@@ -221,7 +222,7 @@ MMVerifyState.prototype.step = function (i, label) {
         }
 
         // check DVs
-        if (this.var2flag) {
+        if (this.use_bitfield_dv) {
             var dvm1, dvm2, dvi1, dvi2, dvs1;
             for (j = 0; j < oframe.mandDv.length; j += 2) {
                 dvm1 = substVars.get(oframe.mandDv[j]);
