@@ -68,7 +68,6 @@ function MMVerifyState(verify, segix, use_abr) {
 
 MMVerifyState.prototype.check = function (i, label) {
     var sym, oframe, i, v;
-    if (label === '?') return;
 
     if (this.aframes.has(label)) {
         oframe = this.aframes.get(label);
@@ -77,18 +76,24 @@ MMVerifyState.prototype.check = function (i, label) {
         sym = this.scoper.getSym(label);
 
         if (!sym || sym.labelled < 0) {
-            return this.errors = [this.proofError(i,'no-such-assertion')];
+            this.errors = [this.proofError(i,'no-such-assertion')];
+            return null;
         }
 
         oframe = this.scoper.getFrame(sym.labelled);
         this.aframes.set(label, oframe);
     }
 
-    if (oframe.errors.length) return this.errors = oframe.errors;
+    if (oframe.errors.length) {
+        this.errors = oframe.errors;
+        return null;
+    }
 
     if (!oframe.hasFrame) {
-        if (oframe.ix >= this.segix || this.scoper.ends_ary[oframe.ix] < this.segix)
-            return this.errors = [this.proofError(i,'inactive-hyp')];
+        if (oframe.ix >= this.segix || this.scoper.ends_ary[oframe.ix] < this.segix) {
+            this.errors = [this.proofError(i,'inactive-hyp')];
+            return null;
+        }
 
         // only explicitly referenced $e/$f hyps can contribute to the variable universe in this proof
         for (i = 0; i < oframe.mandVars.length; i++) {
@@ -103,10 +108,13 @@ MMVerifyState.prototype.check = function (i, label) {
         }
     }
     else {
-        if (oframe.ix >= this.segix)
-            return this.errors = [this.proofError(i,'not-yet-proved')];
+        if (oframe.ix >= this.segix) {
+            this.errors = [this.proofError(i,'not-yet-proved')];
+            return null;
+        }
     }
     this.checked.add(label);
+    return oframe;
 };
 
 MMVerifyState.prototype.save = function () {
@@ -183,18 +191,16 @@ MMVerifyState.prototype.substifyVars = function (substVars, math) {
     return out;
 };
 
-MMVerifyState.prototype.step = function (i, label) {
+MMVerifyState.prototype.step = function (i, oframe) {
     var oframe, j, mand, subst, substVars;
 
     //console.log(`before step ${i} (${label}):`,typeStack.slice(0,this.depth).map(function (t,ix) { return `[${t}@${__array(varStack[ix]).join('+')}@ ${abr.toArray(mathStack[ix],null,20).join(' ')}]`; }).join(' '));
-    if (label === '?') {
+    if (!oframe) {
         this.typeStack[this.depth] = this.varStack[this.depth] = this.mathStack[this.depth] = null;
         this.depth++;
         this.incomplete = true;
         return;
     }
-
-    oframe = this.aframes.get(label);
 
     if (!oframe.hasFrame) {
         //sample('ef/ap',0);
@@ -302,10 +308,11 @@ MMVerifyState.prototype.checkProof = function () {
     // the proof syntax is not self-synchronizing, so for the most part it doesn't make sense to continue
     if (proof.length && proof[0] === '(') {
 
-        var i = 0, k = 0, j, ch, preload=[], chunk, can_save=false;
+        var i = 0, k = 0, j, ch, preload=[], chunk, can_save=false, ref;
         for (i = 0; i < frame.mand.length; i++) {
-            preload.push(this.segments[frame.mand[i].stmt].label);
-            if (this.check(-1, preload[preload.length-1])) return this.errors;
+            ref = this.check(-1, this.segments[frame.mand[i].stmt].label);
+            if (!ref) return this.errors;
+            preload.push(ref);
         }
 
         for (i = 1; ; i++) {
@@ -313,8 +320,8 @@ MMVerifyState.prototype.checkProof = function () {
             if (proof[i] === ')') break;
             if (proof[i] === '?') return [this.proofError(i,'compression-dummy-in-roster')];
             if (this.checked.has(proof[i])) return [this.proofError(i,'compression-redundant-roster')];
-            preload.push(proof[i]);
-            if (this.check(i, proof[i])) return this.errors;
+            if (!(ref = this.check(i, proof[i]))) return this.errors;
+            preload.push(ref);
         }
         //sample('ovar',this.flag2var.length);
 
@@ -343,7 +350,7 @@ MMVerifyState.prototype.checkProof = function () {
                     can_save = false;
                 }
                 else if (ch === 63) {
-                    this.step(-1,'?');
+                    this.step(-1,null);
                     can_save = false;
                 }
                 else {
@@ -354,12 +361,19 @@ MMVerifyState.prototype.checkProof = function () {
         if (k) return [this.proofError(-1,'compressed-partial-integer')];
     }
     else {
+        var steps_frames = [];
         for (i = 0; i < proof.length; i++) {
-            if (this.check(i, proof[i])) return this.errors;
+            if (proof[i] === '?') {
+                steps_frames.push(null);
+            }
+            else {
+                if (!(ref = this.check(i, proof[i]))) return this.errors;
+                steps_frames.push(ref);
+            }
         }
         //sample('ovar',this.flag2var.length);
-        for (i = 0; i < proof.length; i++) {
-            if (this.step(i, proof[i])) return this.errors;
+        for (i = 0; i < steps_frames.length; i++) {
+            if (this.step(i, steps_frames[i])) return this.errors;
         }
     }
 
