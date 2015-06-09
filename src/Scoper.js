@@ -276,16 +276,19 @@ MMScoper.prototype.scan = function () {
 
 // pre-optimize a math string for 'substify' (non-ABR mode only)
 function cook_substify(mandVarsMap, math) {
-    var out = [''];
+    var work = '';
+    var out = [];
     for (var i = 1; i < math.length; i++) {
         if (mandVarsMap.has(math[i])) {
+            out.push(work);
             out.push(mandVarsMap.get(math[i]));
-            out.push('');
+            work = '';
         }
         else {
-            out[out.length - 1] += (math[i] + ' ');
+            work = work + math[i] + ' ';
         }
     }
+    out.push(work);
     return out;
 }
 
