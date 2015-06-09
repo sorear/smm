@@ -156,12 +156,11 @@ MMVerifyState.prototype.substify = function (subst, vmap, math, math_s) {
         return out;
     }
     else {
-        out = '';
-        for (k = 0; ; k += 2) {
-            out = out + math_s[k];
+        out = math_s[0];
+        for (k = 1; k < math_s.length; k += 2) {
+            out = out + subst[math_s[k]];
+            out = out + math_s[k+1];
             if (out.length > 1000000) throw FAST_BAILOUT;
-            if (k + 1 >= math_s.length) break;
-            out = out + subst[math_s[k+1]];
         }
         return out;
     }
