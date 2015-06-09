@@ -129,8 +129,7 @@ MMVerifyState.prototype.getVars = function (math) {
     if (this.use_bitfield_dv) {
         var out = 0, k;
         for (var k = 0; k < math.length; k++) {
-            if (this.var2flag.has(math[k]))
-                out |= this.var2flag.get(math[k]);
+            out |= (this.var2flag.get(math[k]) || 0);
         }
         return out;
     }
@@ -200,7 +199,7 @@ MMVerifyState.prototype.step = function (i, label) {
     if (!oframe.hasFrame) {
         //sample('ef/ap',0);
         this.typeStack[this.depth] = oframe.ttype;
-        this.mathStack[this.depth] = this.use_abr ? this.abr.fromArray(oframe.target) : oframe.target.map(function (x) { return x + ' '; }).join('');
+        this.mathStack[this.depth] = this.use_abr ? this.abr.fromArray(oframe.target) : oframe.target_s[0];
         this.varStack[this.depth] = this.getVars(oframe.target); //Extract variables from this
         this.depth++;
     }

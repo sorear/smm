@@ -301,6 +301,8 @@ function cook_substify_vars(mandVarsMap, math) {
     return out;
 }
 
+var EMPTY_MAP = new Map();
+
 function MMFrame(scoper, ix) {
     var segments = scoper.db.segments;
     var seg = segments[ix];
@@ -332,13 +334,15 @@ function MMFrame(scoper, ix) {
             this.mandVars.push(tok);
         }
     }
-    this.target_v = cook_substify_vars(mandVarsMap, seg.math);
-    this.target_s = cook_substify(mandVarsMap, seg.math);
 
     if (seg.type !== AXIOM && seg.type !== PROVABLE) {
         this.hasFrame = false;
-        return;
     }
+
+    this.target_v = cook_substify_vars(mandVarsMap, seg.math);
+    this.target_s = cook_substify(this.hasFrame ? mandVarsMap : EMPTY_MAP, seg.math); // variables are never substituted in a hypothesis
+
+    if (!this.hasFrame) return;
 
     for (j = scoper.chains_ary[ix]; j >= 0; j = scoper.chains_ary[j]) {
         if (segments[j].type === ESSEN) {
