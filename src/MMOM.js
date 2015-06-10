@@ -96,13 +96,10 @@ MMSource.prototype.lookupPos = function (pos) {
 
 function MMSegment() {
     this.type = MMSegment.EOF;
-    this.spans = [];
+    this._pos = null;
     this.label = null;
     this.math = null;
     this.proof = null;
-    this.mathPos = null;
-    this.startPos = null;
-    this.proofPos = null;
     this.reparse_zone = null;
     this.reparse_index = 0;
 }
@@ -116,6 +113,22 @@ Object.defineProperty(MMSegment.prototype, 'raw', {
         return out;
     }
 });
+Object.defineProperty(MMSegment.prototype, 'mathPos', { get: function () { if (!this._pos) this._unlazy(); return this._pos.mathPos; } });
+Object.defineProperty(MMSegment.prototype, 'proofPos', { get: function () { if (!this._pos) this._unlazy(); return this._pos.proofPos; } });
+Object.defineProperty(MMSegment.prototype, 'startPos', { get: function () { if (!this._pos) this._unlazy(); return this._pos.startPos; } });
+Object.defineProperty(MMSegment.prototype, 'spans', { get: function () { if (!this._pos) this._unlazy(); return this._pos.spans; } });
+
+MMSegment.prototype._unlazy = function () {
+    var scanner = new MMScanner(this.reparse_zone);
+    scanner.lazyPositions = false;
+    scanner.reparsing = true;
+    scanner.index = scanner.segment_start = this.reparse_index;
+    scanner.segment._pos = { startPos: null, mathPos: null, proofPos: null, spans: [] };
+
+    var nseg = scanner.scan();
+    if (!nseg) throw "can't happen - sources unavailable in reparse";
+    this._pos = nseg._pos;
+};
 
 function MMError(source, offset, category, code, data) {
     this.source = source;
@@ -191,6 +204,8 @@ function MMZone(ctx, source, next, next_continue, included) {
     this.included = included;
 }
 
+var BAILOUT_ZONE = new MMZone(new MMScanContext(), new MMSource(null, null), null, 0, []);
+
 function MMScanner(zone) {
     //Output
     this.segment_start = 0;
@@ -215,6 +230,10 @@ function MMScanner(zone) {
     this.zone = zone;
     this.source = zone.source;
     this.index = 0;
+
+    this.reparsing = false;
+    this.lazyPositions = true;
+    //if (!this.lazyPositions) this.segment._pos = { startPos: null, mathPos: [], proofPos: [], spans: [] };
 }
 
 var SP = []; while (SP.length < 33) SP.push(false); SP[32] = SP[9] = SP[13] = SP[12] = SP[10] = true;
@@ -257,8 +276,8 @@ MMScanner.prototype.getToken = function () {
 // You may only call this after comment_state and directive_state have both cleared.  also the current source must be loaded
 MMScanner.prototype.setPosition = function (zone, index) {
     var segment_start = this.segment_start;
-    if (this.index !== segment_start) {
-        this.segment.spans.push(this.source, segment_start, this.index);
+    if (this.segment._pos && this.index !== segment_start) {
+        this.segment._pos.spans.push(this.source, segment_start, this.index);
     }
 
     this.zone = zone;
@@ -271,21 +290,21 @@ MMScanner.prototype.addError = function (code) {
     this.errors.push(new MMError(this.source, this.token_start, 'scanner', code));
 };
 
-MMScanner.prototype.hasSpans = function () {
-    return this.segment_start !== this.index || this.segment.spans.length !== 0;
-};
-
 // We need to be able to reconstruct a segment by restarting parsing with the specified zone and index and a clean segment.  This is trivial for the first segment but for others the loss of parser state is an issue
 // We guarantee below that newSegment is only ever called with comment_state=false, directive_state=false (implying include_file is dead).
 // Most of the time, we call newSegment immediately before restarting the main loop with state=S_IDLE, so restarting from the current zone/index is correct (token_start is dead as it will be immediately clobbered by getToken, lt_* are not used in S_IDLE)
 // When a statement-starting keyword is seen with an active statement, we need to logically start a new statement *before* the just-read token so that the keyword will be correctly seen on reparse.
 MMScanner.prototype.newSegment = function (lt_index) {
-    if (lt_index !== this.segment_start) this.segment.spans.push(this.source, this.segment_start, lt_index);
+    if (this.segment._pos && lt_index !== this.segment_start) this.segment._pos.spans.push(this.source, this.segment_start, lt_index);
     this.segments.push(this.segment);
     this.segment_start = lt_index;
     this.segment = new MMSegment();
     this.segment.reparse_zone = this.zone;
     this.segment.reparse_index = lt_index;
+    if (this.reparsing) {
+        this.zone = BAILOUT_ZONE;
+    }
+    if (!this.lazyPositions) this.segment._pos = { startPos: null, mathPos: null, proofPos: null, spans: [] };
     return this.segment;
 };
 
@@ -320,6 +339,7 @@ MMScanner.prototype.scan = function () {
     var directive_state = this.directive_state;
     var state = this.state;
     var token, lt_index;
+    var posit = !this.lazyPositions;
 
     // note: this version of the loop tokenizes everything, even comments and proofs, which is somewhat wasteful
     while (true) {
@@ -327,6 +347,9 @@ MMScanner.prototype.scan = function () {
         token = this.getToken();
 
         if (token === null) {
+            if (this.zone === BAILOUT_ZONE && this.reparsing) {
+                return this.segments[0];
+            }
             this.comment_state = comment_state;
             this.state = state;
             this.directive_state = directive_state;
@@ -461,7 +484,8 @@ MMScanner.prototype.scan = function () {
                 if (token === '' && this.zone.next) {
                     // file switch: need not interrupt a statement
 
-                    if (state === S_IDLE && this.hasSpans()) {
+                    // idle state cannot span a file boundary with spans (due to EOF having already been created), so it's unneccessary to check that
+                    if (state === S_IDLE && this.index !== this.segment_start) {
                         this.segment.type = MMSegment.EOF;
                         this.setPosition(this.zone.next, this.zone.next_continue);
                         this.newSegment(this.index);
@@ -495,7 +519,7 @@ MMScanner.prototype.scan = function () {
                 else {
                     if (state === S_LABEL) this.addError('spurious-label');
                     this.segment.label = null;
-                    this.segment.startPos = [this.source, this.token_start];
+                    if (posit) this.segment._pos.startPos = [this.source, this.token_start];
                 }
 
                 if (KW_ATOMIC[token]) {
@@ -503,7 +527,9 @@ MMScanner.prototype.scan = function () {
                         this.db = new MMDatabase;
                         this.db.segments = this.segments;
                         this.db.scanErrors = this.errors;
-                        if (this.hasSpans()) this.newSegment(this.index);
+                        if (this.index !== this.segment_start) this.newSegment(this.index);
+                        if (this.reparsing)
+                            return this.segments[0];
                         return this.db;
                     }
                     this.newSegment(this.index);
@@ -512,9 +538,9 @@ MMScanner.prototype.scan = function () {
                 else {
                     state = S_MATH;
                     this.segment.math = [];
-                    this.segment.mathPos = [];
+                    if (posit) this.segment._pos.mathPos = [];
                     if (token === '$p') { // allocate a proof segment even if the segment type was forced to BOGUS due to missing label
-                        this.segment.proofPos = [];
+                        if (posit) this.segment._pos.proofPos = [];
                         this.segment.proof = [];
                     }
                 }
@@ -530,7 +556,7 @@ MMScanner.prototype.scan = function () {
                     if (/[^-_.0-9a-zA-Z]/.test(token))
                         this.addError('invalid-label'); // currently still allow into DOM
                     this.segment.label = token;
-                    this.segment.startPos = [this.source, this.token_start];
+                    if (posit) this.segment._pos.startPos = [this.source, this.token_start];
                     state = S_LABEL;
                 }
                 else if (state === S_LABEL) {
@@ -539,11 +565,11 @@ MMScanner.prototype.scan = function () {
                 }
                 else if (state === S_MATH) {
                     this.segment.math.push(token);
-                    this.segment.mathPos.push(this.source, this.token_start);
+                    if (posit) this.segment._pos.mathPos.push(this.source, this.token_start);
                 }
                 else if (state === S_PROOF) {
                     this.segment.proof.push(token);
-                    this.segment.proofPos.push(this.source, this.token_start);
+                    if (posit) this.segment._pos.proofPos.push(this.source, this.token_start);
                 }
                 break;
         }
