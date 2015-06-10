@@ -315,37 +315,24 @@ MMScanner.prototype.newSegment = function (lt_index) {
     return this.segment;
 };
 
-var KW_TYPE = {
-    '$a': MMSegment.AXIOM,
-    '$p': MMSegment.PROVABLE,
-    '$c': MMSegment.CONST,
-    '$d': MMSegment.DV,
-    '$e': MMSegment.ESSEN,
-    '$f': MMSegment.FLOAT,
-    '$v': MMSegment.VAR,
-    '${': MMSegment.OPEN,
-    '$}': MMSegment.CLOSE,
-    '': MMSegment.EOF,
-};
-
-var KW_LABEL = {
-    '$a': true,
-    '$p': true,
-    '$e': true,
-    '$f': true,
-};
-
-var KW_ATOMIC = {
-    '${': true,
-    '$}': true,
-    '': true,
+var KW_DATA = {
+    '$a': { type: MMSegment.AXIOM,    label: true,  atomic: false },
+    '$p': { type: MMSegment.PROVABLE, label: true,  atomic: false },
+    '$c': { type: MMSegment.CONST,    label: false, atomic: false },
+    '$d': { type: MMSegment.DV,       label: false, atomic: false },
+    '$e': { type: MMSegment.ESSEN,    label: true,  atomic: false },
+    '$f': { type: MMSegment.FLOAT,    label: true,  atomic: false },
+    '$v': { type: MMSegment.VAR,      label: false, atomic: false },
+    '${': { type: MMSegment.OPEN,     label: false, atomic: true },
+    '$}': { type: MMSegment.CLOSE,    label: false, atomic: true },
+    '':   { type: MMSegment.EOF,      label: false, atomic: true },
 };
 
 MMScanner.prototype.scan = function () {
     var comment_state = this.comment_state;
     var directive_state = this.directive_state;
     var state = this.state;
-    var token, lt_index;
+    var token, lt_index, kwdata;
     var posit = !this.lazyPositions;
 
     // note: this version of the loop tokenizes everything, even comments and proofs, which is somewhat wasteful
@@ -540,9 +527,10 @@ MMScanner.prototype.scan = function () {
                     state = S_IDLE;
                 }
 
-                this.segment.type = KW_TYPE[token];
+                kwdata = KW_DATA[token];
+                this.segment.type = kwdata.type
 
-                if (KW_LABEL[token]) {
+                if (kwdata.label) {
                     if (state !== S_LABEL) {
                         this.addError('missing-label');
                         this.segment.type = MMSegment.BOGUS;
@@ -554,7 +542,7 @@ MMScanner.prototype.scan = function () {
                     if (posit) this.segment._pos.startPos = [this.source, this.token_start];
                 }
 
-                if (KW_ATOMIC[token]) {
+                if (kwdata.atomic) {
                     if (token === '') {
                         this.db = new MMDatabase;
                         this.db.segments = this.segments;
