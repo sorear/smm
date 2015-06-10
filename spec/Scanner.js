@@ -171,7 +171,7 @@ describe('nested comment:', function () {
     src('$( foo $( bar $)')
     it('has one segment', function () { expect(db.segments.length).toBe(1); });
     it('first is comment', function () { expect(seg(db,0)).toEqual([mmom.Segment.COMMENT,'$( foo $( bar $)',null,null]); });
-    errs([['afile',7,'scanner','nested-comment']]);
+    errs([['afile',7,'scanner','pseudo-nested-comment']]);
 });
 
 describe('bad characters in comment:', function () {
@@ -193,7 +193,7 @@ describe('not a nested comment:', function () {
     src('$( x$( $a $q $)')
     it('has one segment', function () { expect(db.segments.length).toBe(1); });
     it('first is comment', function () { expect(seg(db,0)).toEqual([mmom.Segment.COMMENT,'$( x$( $a $q $)',null,null]); });
-    errs([]);
+    errs([['afile',3,'scanner','pseudo-nested-comment']]);
 });
 
 describe('false comment end:', function () {

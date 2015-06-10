@@ -8,7 +8,6 @@ Erratum: This appears to forbid tokens in comments that contain $ but are not a 
 4.1.2 #1 A comment MUST be bracketed by the $( and $) tokens
 4.1.2 #2 A comment MUST NOT contain the character sequences $( or $), but MAY contain any other printable characters
 Erratum: Does this imply that $( and $) are illegal even within tokens?
-NYI: We check for $) mid-token, but $( only as a token
 Erratum: This explicitly permits $( $t $), contradicting 4.1.1#2
 4.1.2 #3 A file inclusion command MUST consist of a file name (math token) bracketed by $[ $] tokens
 Erratum: Interaction with comments and file boundaries unspecified; email suggests only allowing between statements at top level scope

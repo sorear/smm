@@ -195,6 +195,7 @@ function MMScanner(zone) {
     this.segments = [];
     this.db = null;
     this.errors = [];
+    this.typesetting_comment = null;
 
     //State machine
     //Define a quiescent state as where IDLE, !comment, !directive, at the top of the loop in scan()
@@ -325,10 +326,6 @@ MMScanner.prototype.scan = function () {
 
         if (comment_state) {
             switch (token) {
-                case '$(':
-                    this.addError('nested-comment');
-                    continue;
-
                 case '$)':
                     comment_state = false;
 
@@ -345,8 +342,15 @@ MMScanner.prototype.scan = function () {
                     break; // fall through so that we'll also handle an enclosing comment and end the file
 
                 default:
-                    if (token.indexOf('$)') >= 0)
-                        this.addError('pseudo-comment-end');
+                    if (token.indexOf('$') >= 0) {
+                        if (token.indexOf('$)') >= 0)
+                            this.addError('pseudo-comment-end');
+                        if (token.indexOf('$(') >= 0)
+                            this.addError('pseudo-nested-comment');
+                        if (token === '$t') {
+                            this.typesetting_comment = this.segment; // since we can very efficiently find this here
+                        }
+                    }
                     continue;
             }
         }
