@@ -310,6 +310,7 @@ MMScanner.prototype.newSegment = function (lt_index) {
     this.segment.reparse_index = lt_index;
     if (this.reparsing) {
         this.zone = BAILOUT_ZONE;
+        this.source = this.zone.source;
     }
     if (!this.lazyPositions) this.segment._pos = { startPos: null, mathPos: null, proofPos: null, spans: [] };
     return this.segment;
