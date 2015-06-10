@@ -1,0 +1,5 @@
+1. Install nvm from https://github.com/creationix/nvm (this will hack your shell rcfile, and only works with Bourneish shells on Unix; if not Unix, skip this step)
+2. Install io.js 2+ and npm via "nvm install iojs" (Unix); (There is an official io.js installer for Windows.  I have not tested this route.)
+3. Download dependencies with "npm install" with the current directory as the smm checkout
+4. Run self-tests: node node_modules/.bin/jasmine
+5. Use it: node misc/verify.js ../set.mm
