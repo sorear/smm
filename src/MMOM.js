@@ -100,7 +100,6 @@ function MMSegment() {
     this.label = null;
     this.math = null;
     this.proof = null;
-    this.errors = null;
     this.mathPos = null;
     this.startPos = null;
     this.proofPos = null;
@@ -145,20 +144,8 @@ MMSegment.INCLUDE = 13;
 
 var S_IDLE=1,S_LABEL=2,S_MATH=3,S_PROOF=4;
 
-function MMScanner(root, resolver, sync) {
-    //Output
-    this.segment_start = 0;
-    this.segments = [];
-    this.db = null;
-    this.errors = [];
-
-    //State machine
-    this.state = S_IDLE;
-    this.comment_state = false;
-    this.directive_state = false;
-    this.include_file = null;
-    this.segment = new MMSegment();
-
+// A scan context is a stateless object which survives the scan so as to support later lazy rescans.
+function MMScanContext(root, resolver, sync) {
     if (typeof resolver === 'string') {
         resolver = new Map([[ root, resolver ]]);
     }
@@ -174,30 +161,68 @@ function MMScanner(root, resolver, sync) {
         };
     }
     this.sync = sync;
+    this.resolver = resolver;
+    this.sources = new Map();
+}
+
+MMScanContext.prototype.getSource = function (name) {
+    var src = this.sources.get(name);
+    if (!src) {
+        src = new MMSource(name, null);
+        this.resolver(src);
+        if (this.sync && src.text === null) throw 'Resolver failed to synchronously return text in parseSync context';
+        this.sources.set(name, src);
+    }
+    return src;
+};
+
+MMScanContext.prototype.initialZone = function (name) {
+    return new MMZone(this, this.getSource(name), null, 0, [name]);
+};
+
+// A zone stores the set of included files and the include stack.  A source position can always be identified by a zone and an offset.
+function MMZone(ctx, source, next, next_continue, included) {
+    this.ctx = ctx;
+    this.source = source;
+    this.next = next;
+    this.next_continue = next_continue;
+    this.included = included;
+}
+
+function MMScanner(zone) {
+    //Output
+    this.segment_start = 0;
+    this.segments = [];
+    this.db = null;
+    this.errors = [];
+
+    //State machine
+    //Define a quiescent state as where IDLE, !comment, !directive, at the top of the loop in scan()
+    //Then include_file/token_start/lt_index/lt_zone are dead, segment can be considered fresh
+    this.state = S_IDLE;
+    this.comment_state = false;
+    this.directive_state = false;
+    this.include_file = null;
+    this.segment = new MMSegment();
+    this.token_start = 0;
+    this.lt_zone = null;
+    this.lt_index = 0;
 
     //Input
-    this.queue = [];
-    this.included = {};
-    this.resolver = resolver;
-    resolver(this.source = this.included[root] = new MMSource(root, null));
-    if (this.sync && this.source.text === null) throw 'Resolver failed to synchronously return text in parseSync context';
+    this.zone = zone;
+    this.source = zone.source;
     this.index = 0;
-    this.length = -1;
-    this.token_start = 0;
 }
 
 var SP = []; while (SP.length < 33) SP.push(false); SP[32] = SP[9] = SP[13] = SP[12] = SP[10] = true;
 
 MMScanner.prototype.getToken = function () {
-    var ix = this.index, str = this.source.text, len = this.length, start, chr;
-
+    var ix = this.index, str = this.source.text;
     // source not yet loaded
     if (str === null) {
         return null;
     }
-    if (len < 0) {
-        len = str.length;
-    }
+    var len = str.length, start, chr;
 
     while (ix < len && (chr = str.charCodeAt(ix)) <= 32 && SP[chr]) ix++;
     this.token_start = start = ix;
@@ -217,46 +242,26 @@ MMScanner.prototype.getToken = function () {
     this.index = ix;
 
     if (start === ix) {
-        if (this.length < 0) {
-            // abuse length to record EOF-hit
-            this.length = ix;
-            if (this.source.failed)
-                this.addError('failed-to-read');
-        }
+        // getToken should return '' exactly once before the zone is switched out, hence falls through below
+        if (this.source.failed)
+            this.addError('failed-to-read');
         return '';
     }
 
     return str.substring(start, ix);
 };
 
-MMScanner.prototype.includeFile = function (file) {
-    if (this.included[file])
-        return;
-
-    var src = this.included[file] = new MMSource(file, null);
-    this.resolver(src);
-    if (this.sync && src.text === null) throw 'Resolver failed to synchronously return text in parseSync context';
-
-    // return to the current source
-    this.queue.push({ source: this.source, index: this.index, length: this.length });
-    // do the other thing first
-    this.queue.push({ source: src, index: 0, length: -1 });
-    // switch ASAP
-    this.length = this.index;
-};
-
-// call this after getToken has returned '' at least once
-MMScanner.prototype.nextSource = function () {
-    var end = this.length < 0 ? this.source.text.length : this.length;
+// You may only call this after comment_state and directive_state have both cleared.  also the current source must be loaded
+MMScanner.prototype.setPosition = function (zone, index) {
     var segment_start = this.segment_start;
-    if (end !== segment_start) {
-        this.segment.spans.push(this.source, segment_start, end);
+    if (this.index !== segment_start) {
+        this.segment.spans.push(this.source, segment_start, this.index);
     }
 
-    var rec = this.queue.pop();
-    this.source = rec.source;
-    this.index = this.segment_start = rec.index;
-    this.length = rec.length;
+    this.zone = zone;
+    this.source = zone.source;
+    this.index = index;
+    this.segment_start = index;
 };
 
 MMScanner.prototype.addError = function (code) {
@@ -301,7 +306,6 @@ var KW_ATOMIC = {
     '': true,
 };
 
-// quick and dirty scanner
 MMScanner.prototype.scan = function () {
     var comment_state = this.comment_state;
     var directive_state = this.directive_state;
@@ -323,7 +327,7 @@ MMScanner.prototype.scan = function () {
             switch (token) {
                 case '$(':
                     this.addError('nested-comment');
-                    break;
+                    continue;
 
                 case '$)':
                     comment_state = false;
@@ -333,20 +337,18 @@ MMScanner.prototype.scan = function () {
                         this.newSegment();
                     }
 
-                    break;
+                    continue;
 
                 case '':
                     this.addError('eof-in-comment');
                     comment_state = false;
-                    break; // full EOF processing on next loop
+                    break; // fall through so that we'll also handle an enclosing comment and end the file
 
                 default:
                     if (token.indexOf('$)') >= 0)
                         this.addError('pseudo-comment-end');
-                    break;
+                    continue;
             }
-
-            continue;
         }
 
         if (directive_state) {
@@ -357,7 +359,9 @@ MMScanner.prototype.scan = function () {
                     continue;
                 }
 
-                this.includeFile(this.include_file);
+                // TODO: this requires resolution to deal with path canonicity issues
+                if (this.zone.included.indexOf(this.include_file) < 0)
+                    this.setPosition( new MMZone( this.zone.ctx, this.zone.ctx.getSource(this.include_file), this.zone, this.index, this.zone.included.concat(this.include_file) ), 0 );
 
                 if (state === S_IDLE) {
                     this.segment.type = MMSegment.INCLUDE;
@@ -370,21 +374,22 @@ MMScanner.prototype.scan = function () {
             if (token === '') {
                 this.addError('unterminated-directive');
                 directive_state = false;
+                // fall through to handle end of the current file
+            }
+            else {
+                if (this.include_file !== null) {
+                    this.addError('directive-too-long');
+                    continue;
+                }
+
+                if (token.indexOf('$') >= 0) {
+                    this.addError('dollar-in-filename');
+                    continue;
+                }
+
+                this.include_file = token;
                 continue;
             }
-
-            if (this.include_file !== null) {
-                this.addError('directive-too-long');
-                continue;
-            }
-
-            if (token.indexOf('$') >= 0) {
-                this.addError('dollar-in-filename');
-                continue;
-            }
-
-            this.include_file = token;
-            continue;
         }
 
         switch (token) {
@@ -440,7 +445,7 @@ MMScanner.prototype.scan = function () {
             case '${':
             case '$}':
             case '':
-                if (token === '' && this.queue.length) {
+                if (token === '' && this.zone.next) {
                     // file switch: need not interrupt a statement
 
                     if (state === S_IDLE && this.hasSpans()) {
@@ -448,7 +453,7 @@ MMScanner.prototype.scan = function () {
                         this.newSegment();
                     }
 
-                    this.nextSource();
+                    this.setPosition(this.zone.next, this.zone.next_continue);
                     break;
                 }
 
@@ -537,7 +542,7 @@ function MMDatabase() {
 }
 
 MMScanner.parseSync = function (name, resolver) {
-    return new MMScanner(name, resolver, true).scan();
+    return new MMScanner(new MMScanContext(name, resolver, true).initialZone(name)).scan();
 };
 
 return {
