@@ -67,12 +67,9 @@ function MMVerifyState(verify, segix, use_abr) {
 }
 
 MMVerifyState.prototype.check = function (i, label) {
-    var sym, oframe, i, v;
+    var sym, oframe = this.aframes.get(label), i, v;
 
-    if (this.aframes.has(label)) {
-        oframe = this.aframes.get(label);
-    }
-    else {
+    if (!oframe) {
         sym = this.scoper.getSym(label);
 
         if (!sym || sym.labelled < 0) {
