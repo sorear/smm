@@ -223,7 +223,7 @@ function MMScanner(zone) {
     this.include_file = null;
     this.segment = new MMSegment();
     this.token_start = 0;
-    this.token_dollar = false;
+    this.token_special = false;
     this.segment.reparse_zone = zone;
     this.segment.reparse_index = 0;
 
@@ -249,7 +249,7 @@ MMScanner.prototype.getToken = function () {
 
     while (ix < len && (chr = str.charCodeAt(ix)) <= 32 && SP[chr]) ix++;
     this.token_start = start = ix;
-    this.token_dollar = false;
+    this.token_special = false;
     while (ix < len && ((chr = str.charCodeAt(ix)) > 32 || !SP[chr])) {
         if (chr < 32 || chr > 126) {
             this.addError('bad-character');
@@ -261,7 +261,7 @@ MMScanner.prototype.getToken = function () {
             continue;
         }
         else if (chr === 0x24) {
-            this.token_dollar = true;
+            this.token_special = true;
         }
         ix++;
     }
@@ -272,6 +272,7 @@ MMScanner.prototype.getToken = function () {
         // getToken should return '' exactly once before the zone is switched out, hence falls through below
         if (this.source.failed)
             this.addError('failed-to-read');
+        this.token_special = true;
         return '';
     }
 
@@ -362,6 +363,7 @@ MMScanner.prototype.scan = function () {
         }
 
         if (comment_state) {
+            if (!this.token_special) continue;
             switch (token) {
                 case '$)':
                     comment_state = false;
@@ -373,21 +375,20 @@ MMScanner.prototype.scan = function () {
 
                     continue;
 
+                case '$t':
+                    this.typesetting_comment = this.segment; // since we can very efficiently find this here
+                    continue;
+
                 case '':
                     this.addError('eof-in-comment');
                     comment_state = false;
                     break; // fall through so that we'll also handle an enclosing comment and end the file
 
                 default:
-                    if (this.token_dollar) {
-                        if (token.indexOf('$)') >= 0)
-                            this.addError('pseudo-comment-end');
-                        if (token.indexOf('$(') >= 0)
-                            this.addError('pseudo-nested-comment');
-                        if (token === '$t') {
-                            this.typesetting_comment = this.segment; // since we can very efficiently find this here
-                        }
-                    }
+                    if (token.indexOf('$)') >= 0)
+                        this.addError('pseudo-comment-end');
+                    if (token.indexOf('$(') >= 0)
+                        this.addError('pseudo-nested-comment');
                     continue;
             }
         }
@@ -423,7 +424,7 @@ MMScanner.prototype.scan = function () {
                     continue;
                 }
 
-                if (this.token_dollar) {
+                if (this.token_special) {
                     this.addError('dollar-in-filename');
                     continue;
                 }
@@ -431,6 +432,31 @@ MMScanner.prototype.scan = function () {
                 this.include_file = token;
                 continue;
             }
+        }
+
+        if (!this.token_special) {
+            switch (state) {
+                case S_IDLE:
+                    if (/[^-_.0-9a-zA-Z]/.test(token))
+                        this.addError('invalid-label'); // currently still allow into DOM
+                    this.segment.label = token;
+                    if (posit) this.segment._pos.startPos = [this.source, this.token_start];
+                    state = S_LABEL;
+                    break;
+                case S_LABEL:
+                    this.addError('duplicate-label');
+                    this.segment.label = token;
+                    break;
+                case S_MATH:
+                    this.segment.math.push(token);
+                    if (posit) this.segment._pos.mathPos.push(this.source, this.token_start);
+                    break;
+                case S_PROOF:
+                    this.segment.proof.push(token);
+                    if (posit) this.segment._pos.proofPos.push(this.source, this.token_start);
+                    break;
+            }
+            continue;
         }
 
         switch (token) {
@@ -552,30 +578,7 @@ MMScanner.prototype.scan = function () {
                 break;
 
             default:
-                if (this.token_dollar) {
-                    this.addError('pseudo-keyword');
-                    break;
-                }
-
-                if (state === S_IDLE) {
-                    if (/[^-_.0-9a-zA-Z]/.test(token))
-                        this.addError('invalid-label'); // currently still allow into DOM
-                    this.segment.label = token;
-                    if (posit) this.segment._pos.startPos = [this.source, this.token_start];
-                    state = S_LABEL;
-                }
-                else if (state === S_LABEL) {
-                    this.addError('duplicate-label');
-                    this.segment.label = token;
-                }
-                else if (state === S_MATH) {
-                    this.segment.math.push(token);
-                    if (posit) this.segment._pos.mathPos.push(this.source, this.token_start);
-                }
-                else if (state === S_PROOF) {
-                    this.segment.proof.push(token);
-                    if (posit) this.segment._pos.proofPos.push(this.source, this.token_start);
-                }
+                this.addError('pseudo-keyword');
                 break;
         }
     }
