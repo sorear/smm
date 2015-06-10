@@ -48,7 +48,7 @@ MMScoper.prototype.addError = function (pos,ix,code,data) {
 // note, even with invalid input we do not allow the symbol table to contain overlapping active ranges for $v/$f.  so it is only necessary to check the last math entry
 MMScoper.prototype.getSym = function (label) {
     var symtab = this.symtab, r;
-    return symtab.get(label) || (symtab.set(label, r = { labelled: -1, math: [], mathix: [], float: [] }), r);
+    return symtab.get(label) || (symtab.set(label, r = { labelled: -1, math: [], mathix: [], float: [], checkGen: -1 }), r);
 };
 
 MMScoper.prototype.labelCheck = function (segix) {
@@ -78,19 +78,17 @@ MMScoper.prototype.mathCheck = function (segix) {
     var segtab = this.db.segments;
     var seg = segtab[segix];
     var ends_ary = this.ends_ary;
-    var i, sym, checked;
+    var i, sym;
 
     if (seg.math.length === 0) {
         this.addError(seg.startPos, 0, 'eap-empty');
         return;
     }
 
-    checked = new Set();
     for (i = 0; i < seg.math.length; i++) {
-        if (checked.has(seg.math[i])) continue;
-        checked.add(seg.math[i]);
-
         sym = this.getSym(seg.math[i]);
+        if (sym.checkGen === segix) continue;
+        sym.checkGen = segix;
 
         if (!sym.math.length || ends_ary[sym.math[sym.math.length - 1]] !== HIGHSEG) {
             this.addError(seg.mathPos, i, 'eap-not-active-sym');
