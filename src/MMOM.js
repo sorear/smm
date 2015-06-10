@@ -258,6 +258,7 @@ MMScanner.prototype.getToken = function () {
             while (ix < len && !SP[str.charCodeAt(ix)]) ix++;
             while (ix < len && SP[str.charCodeAt(ix)]) ix++;
             this.token_start = start = ix;
+            this.token_special = false;
             continue;
         }
         else if (chr === 0x24) {
