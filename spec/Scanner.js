@@ -320,8 +320,8 @@ var cases = [
         tag: "missing $. on math",
         src: 'foo $a x y $c z $.',
         seg: [
-            { typ: 'AXIOM', raw: 'foo $a x y $c', mat: ['x','y'], lbl: 'foo', prf: null },
-            { typ: 'CONST', raw: ' z $.', mat: ['z'], lbl: null, prf: null },
+            { typ: 'AXIOM', raw: 'foo $a x y', mat: ['x','y'], lbl: 'foo', prf: null },
+            { typ: 'CONST', raw: ' $c z $.', mat: ['z'], lbl: null, prf: null },
         ],
         err: [['afile',11,'scanner','nonterminated-math']],
     },
@@ -329,8 +329,8 @@ var cases = [
         tag: "missing $. on math/$p",
         src: 'foo $p x y $c z $.',
         seg: [
-            { typ: 'PROVABLE', raw: 'foo $p x y $c', mat: ['x','y'], lbl: 'foo', prf: [] },
-            { typ: 'CONST', raw: ' z $.', mat: ['z'], lbl: null, prf: null },
+            { typ: 'PROVABLE', raw: 'foo $p x y', mat: ['x','y'], lbl: 'foo', prf: [] },
+            { typ: 'CONST', raw: ' $c z $.', mat: ['z'], lbl: null, prf: null },
         ],
         err: [['afile',11,'scanner','nonterminated-math']],
     },
@@ -338,8 +338,8 @@ var cases = [
         tag: "missing $. on proof",
         src: 'foo $p x y $= w $c z $.',
         seg: [
-            { typ: 'PROVABLE', raw: 'foo $p x y $= w $c', mat: ['x','y'], lbl: 'foo', prf: ['w'] },
-            { typ: 'CONST', raw: ' z $.', mat: ['z'], lbl: null, prf: null },
+            { typ: 'PROVABLE', raw: 'foo $p x y $= w', mat: ['x','y'], lbl: 'foo', prf: ['w'] },
+            { typ: 'CONST', raw: ' $c z $.', mat: ['z'], lbl: null, prf: null },
         ],
         err: [['afile',16,'scanner','nonterminated-proof']],
     },
