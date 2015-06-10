@@ -223,6 +223,7 @@ function MMScanner(zone) {
     this.include_file = null;
     this.segment = new MMSegment();
     this.token_start = 0;
+    this.token_dollar = false;
     this.segment.reparse_zone = zone;
     this.segment.reparse_index = 0;
 
@@ -248,6 +249,7 @@ MMScanner.prototype.getToken = function () {
 
     while (ix < len && (chr = str.charCodeAt(ix)) <= 32 && SP[chr]) ix++;
     this.token_start = start = ix;
+    this.token_dollar = false;
     while (ix < len && ((chr = str.charCodeAt(ix)) > 32 || !SP[chr])) {
         if (chr < 32 || chr > 126) {
             this.addError('bad-character');
@@ -257,6 +259,9 @@ MMScanner.prototype.getToken = function () {
             while (ix < len && SP[str.charCodeAt(ix)]) ix++;
             this.token_start = start = ix;
             continue;
+        }
+        else if (chr === 0x24) {
+            this.token_dollar = true;
         }
         ix++;
     }
@@ -374,7 +379,7 @@ MMScanner.prototype.scan = function () {
                     break; // fall through so that we'll also handle an enclosing comment and end the file
 
                 default:
-                    if (token.indexOf('$') >= 0) {
+                    if (this.token_dollar) {
                         if (token.indexOf('$)') >= 0)
                             this.addError('pseudo-comment-end');
                         if (token.indexOf('$(') >= 0)
@@ -418,7 +423,7 @@ MMScanner.prototype.scan = function () {
                     continue;
                 }
 
-                if (token.indexOf('$') >= 0) {
+                if (this.token_dollar) {
                     this.addError('dollar-in-filename');
                     continue;
                 }
@@ -547,7 +552,7 @@ MMScanner.prototype.scan = function () {
                 break;
 
             default:
-                if (token.indexOf('$') >= 0) {
+                if (this.token_dollar) {
                     this.addError('pseudo-keyword');
                     break;
                 }
