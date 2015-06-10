@@ -103,6 +103,8 @@ function MMSegment() {
     this.mathPos = null;
     this.startPos = null;
     this.proofPos = null;
+    this.reparse_zone = null;
+    this.reparse_index = 0;
 }
 
 Object.defineProperty(MMSegment.prototype, 'raw', {
@@ -206,8 +208,8 @@ function MMScanner(zone) {
     this.include_file = null;
     this.segment = new MMSegment();
     this.token_start = 0;
-    this.lt_zone = null;
-    this.lt_index = 0;
+    this.segment.reparse_zone = zone;
+    this.segment.reparse_index = 0;
 
     //Input
     this.zone = zone;
@@ -273,12 +275,18 @@ MMScanner.prototype.hasSpans = function () {
     return this.segment_start !== this.index || this.segment.spans.length !== 0;
 };
 
-MMScanner.prototype.newSegment = function () {
-    this.segment.spans.push(this.source, this.segment_start, this.index);
+// We need to be able to reconstruct a segment by restarting parsing with the specified zone and index and a clean segment.  This is trivial for the first segment but for others the loss of parser state is an issue
+// We guarantee below that newSegment is only ever called with comment_state=false, directive_state=false (implying include_file is dead).
+// Most of the time, we call newSegment immediately before restarting the main loop with state=S_IDLE, so restarting from the current zone/index is correct (token_start is dead as it will be immediately clobbered by getToken, lt_* are not used in S_IDLE)
+// When a statement-starting keyword is seen with an active statement, we need to logically start a new statement *before* the just-read token so that the keyword will be correctly seen on reparse.
+MMScanner.prototype.newSegment = function (lt_index) {
+    if (lt_index !== this.segment_start) this.segment.spans.push(this.source, this.segment_start, lt_index);
     this.segments.push(this.segment);
-
-    this.segment_start = this.index;
-    return this.segment = new MMSegment();
+    this.segment_start = lt_index;
+    this.segment = new MMSegment();
+    this.segment.reparse_zone = this.zone;
+    this.segment.reparse_index = lt_index;
+    return this.segment;
 };
 
 var KW_TYPE = {
@@ -311,10 +319,11 @@ MMScanner.prototype.scan = function () {
     var comment_state = this.comment_state;
     var directive_state = this.directive_state;
     var state = this.state;
-    var token;
+    var token, lt_index;
 
     // note: this version of the loop tokenizes everything, even comments and proofs, which is somewhat wasteful
     while (true) {
+        lt_index = this.index;
         token = this.getToken();
 
         if (token === null) {
@@ -331,7 +340,7 @@ MMScanner.prototype.scan = function () {
 
                     if (state === S_IDLE) {
                         this.segment.type = MMSegment.COMMENT;
-                        this.newSegment();
+                        this.newSegment(this.index);
                     }
 
                     continue;
@@ -369,7 +378,7 @@ MMScanner.prototype.scan = function () {
 
                 if (state === S_IDLE) {
                     this.segment.type = MMSegment.INCLUDE;
-                    this.newSegment();
+                    this.newSegment(this.index);
                 }
 
                 continue;
@@ -415,12 +424,12 @@ MMScanner.prototype.scan = function () {
                     if (this.segment.type === MMSegment.PROVABLE && state === S_MATH) {
                         this.addError('missing-proof');
                     }
-                    this.newSegment();
+                    this.newSegment(this.index);
                 }
                 else {
                     this.addError('spurious-period'); // IDLE or LABEL
                     this.segment.type = MMSegment.BOGUS;
-                    this.newSegment();
+                    this.newSegment(this.index);
                 }
                 state = S_IDLE;
                 break;
@@ -454,22 +463,24 @@ MMScanner.prototype.scan = function () {
 
                     if (state === S_IDLE && this.hasSpans()) {
                         this.segment.type = MMSegment.EOF;
-                        this.newSegment();
+                        this.setPosition(this.zone.next, this.zone.next_continue);
+                        this.newSegment(this.index);
                     }
-
-                    this.setPosition(this.zone.next, this.zone.next_continue);
+                    else {
+                        this.setPosition(this.zone.next, this.zone.next_continue);
+                    }
                     break;
                 }
 
                 // less than ideal because the keyword gets boxed into the last segment.  should ideally back up the previous by a statement or two
                 if (state === S_MATH) {
                     this.addError('nonterminated-math');
-                    this.newSegment();
+                    this.newSegment(lt_index);
                     state = S_IDLE;
                 }
                 else if (state === S_PROOF) {
                     this.addError('nonterminated-proof');
-                    this.newSegment();
+                    this.newSegment(lt_index);
                     state = S_IDLE;
                 }
 
@@ -492,10 +503,10 @@ MMScanner.prototype.scan = function () {
                         this.db = new MMDatabase;
                         this.db.segments = this.segments;
                         this.db.scanErrors = this.errors;
-                        if (this.hasSpans()) this.newSegment();
+                        if (this.hasSpans()) this.newSegment(this.index);
                         return this.db;
                     }
-                    this.newSegment();
+                    this.newSegment(this.index);
                     state = S_IDLE;
                 }
                 else {
