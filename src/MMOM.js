@@ -592,6 +592,7 @@ return {
     Segment: MMSegment,
     Scanner: MMScanner,
     Database: MMDatabase,
+    ScanContext: MMScanContext,
 };
 
 });
