@@ -94,6 +94,7 @@ MMSource.prototype.lookupPos = function (pos) {
     return [ low+skip+1, pos-the_map[low]+1 ]; // "column" will be slightly off in the presence of tabs (evil) and supplementary characters (I care, but not much)
 };
 
+// TODO: Add a length field and turn the zones into a linked list to support raw-text extraction without a reparse.  Will probably be needed for efficient comment rendering and WRITE SOURCE
 function MMSegment() {
     this.type = MMSegment.EOF;
     this._pos = null;
@@ -130,6 +131,7 @@ MMSegment.prototype._unlazy = function () {
     this._pos = nseg._pos;
 };
 
+// TODO change this to a span list, provide span list extractors for tokens, segments, compressed integers
 function MMError(source, offset, category, code, data) {
     this.source = source;
     this.offset = offset;

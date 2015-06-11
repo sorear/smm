@@ -25,6 +25,7 @@ MMVerifyStandard.install = function (db) {
     return db.plugins.verify || (db.plugins.verify = new MMVerifyStandard(db));
 };
 
+// TODO: use "data" more systematically so that e.g. the math strings are displayed on unification and dv failure
 MMVerifyStandard.prototype.proofError = function (seg, i, code, data) {
     if (i < 0) return new mmom.Error(seg.startPos[0], seg.startPos[1], 'verify', code, data);
     return new mmom.Error(seg.proofPos[2*i+0], seg.proofPos[2*i+1], 'verify', code, data);
