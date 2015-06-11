@@ -9,7 +9,7 @@ try {
 } catch (e) {}
 
 if (isNode) {
-    write = function (str) { process.stdout.write(str, 'utf8'); };
+    write = function (str) { process.stdout.write(str.toString(), 'utf8'); };
     readfile = function (file) { return require('fs').readFileSync(file, 'utf8'); };
     filename = process.argv[2];
 
@@ -35,7 +35,7 @@ else if (isD8) {
 }
 
 var time_1 = Date.now();
-var db = mmom.Scanner.parseSync( filename, readfile(filename) );
+var db = mmom.Scanner.parseSync( filename, function (s) { try { s.text = readfile(s.name); } catch(e) { write(e); s.text = ''; s.failed = true; } });
 var time_2 = Date.now();
 write(`parse ${time_2 - time_1} ms\n`);
 db.scanErrors.forEach(function(e) {

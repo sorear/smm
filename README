@@ -1,5 +1,21 @@
-1. Install nvm from https://github.com/creationix/nvm (this will hack your shell rcfile, and only works with Bourneish shells on Unix; if not Unix, skip this step)
-2. Install io.js 2+ and npm via "nvm install iojs" (Unix); (There is an official io.js installer for Windows.  I have not tested this route.)
-3. Download dependencies with "npm install" with the current directory as the smm checkout
+This is smm, a library to read and manipulate .mm files used by the Metamath
+System (http://us.metamath.org/).  It is written in Javascript, making fairly
+important use of the ES6 Map and Set objects and much less important use of
+several other ES6 features; currently only io.js 2 and d8 4.5 are known to
+work.  It is distributed under the MIT license (LICENSE).
+
+To install prerequisites and use smm to verify a set.mm file:
+
+1. Install nvm from https://github.com/creationix/nvm (this will hack your
+shell rcfile, and only works with Bourneish shells on Unix; if not Unix, skip
+this step)
+
+2. Install io.js 2+ and npm via "nvm install iojs" (Unix); (There is an
+official io.js installer for Windows.  I have not tested this route.)
+
+3. Download dependencies with "npm install" with the current directory as the
+smm checkout
+
 4. Run self-tests: node node_modules/.bin/jasmine
+
 5. Use it: node misc/verify.js ../set.mm
