@@ -17,9 +17,7 @@ function MMScoper(db) {
     this.scan();
 }
 
-MMScoper.install = function (db) {
-    return db.plugins.scoper || (db.plugins.scoper = new MMScoper(db));
-};
+MMOM.Database.registerAnalyzer('scoper', MMScoper);
 
 MMOM.Error.register('scope', 'label-used-twice', 'A label may only be defined once«prev:Previous definition:l»');
 MMOM.Error.register('scope', 'math-then-label', 'A label may not be defined which is the same as a defined math token«prev:Previous definition:l»');
@@ -464,5 +462,4 @@ MMScoper.prototype.getFrame = function (ix) {
     return new MMFrame(this, ix);
 };
 
-return MMScoper;
 });

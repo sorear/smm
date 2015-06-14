@@ -648,13 +648,27 @@ MMOMScanner.prototype.scan = function () {
     }
 };
 
+var KnownAnalyzerKeys = [];
+
 function MMOMDatabase() {
     this.statements = null;
     this.scanErrors = null;
-    this.plugins = {};
+    for (var i = 0; i < KnownAnalyzerKeys.length; i++) {
+        this[KnownAnalyzerKeys[i]] = null;
+    }
 }
 
-Object.defineProperty(MMOMDatabase, 'statementCount', { get: function () { return this.statements.length; } });
+MMOMDatabase.registerAnalyzer = function (name, constructor) {
+    var key = '__' + name;
+
+    KnownAnalyzerKeys.push(key);
+
+    Object.defineProperty(MMOMDatabase.prototype, name, { get: function () {
+        return this[key] || (this[key] = new constructor(this));
+    } });
+};
+
+Object.defineProperty(MMOMDatabase.prototype, 'statementCount', { get: function () { return this.statements.length; } });
 MMOMDatabase.prototype.statement = function (ix) { return this.statements[ix]; };
 
 function parseSync(name, resolver) {

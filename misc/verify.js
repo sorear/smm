@@ -1,8 +1,8 @@
 var write = function (str) { process.stdout.write(str.toString(), 'utf8'); };
 
 var MMOM = require('../src/MMOM.js');
-var Scoper = require('../src/Scoper.js');
-var Verify = require('../src/Verify.js');
+require('../src/Scoper.js');
+require('../src/Verifier.js');
 var ConsoleErrorFormatter = require('../src/ConsoleErrorFormatter.js');
 
 function time(why,f) {
@@ -16,15 +16,14 @@ var db;
 
 time('parse', function () { db = MMOM.parseSync(process.argv[2], function (s) { return require('fs').readFileSync(s, 'utf8'); }); });
 write(ConsoleErrorFormatter(db.scanErrors));
-time('scope', function () { Scoper.install(db); });
-write(ConsoleErrorFormatter(db.plugins.scoper.errors));
+time('scope', function () { db.scoper; });
+write(ConsoleErrorFormatter(db.scoper.errors));
 time('verify', function () {
     var verifd = 0;
-    Verify.install(db);
     db.statements.forEach(function (s,ix) {
         if (s.type === MMOM.Statement.PROVABLE) {
             verifd++;
-            var err = Verify.install(db).verify(ix,false);
+            var err = db.verifier.verify(ix);
             if (err.length) write(`${s.label} ERR\n`);
             write(ConsoleErrorFormatter(err));
         }

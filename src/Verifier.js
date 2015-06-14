@@ -36,13 +36,11 @@ function sample(name,val) {
 
 function MMVerifyStandard(db) {
     this.db = db;
-    this.scoper = Scoper.install(db);
+    this.scoper = db.scoper;
     this.aframes = new Map();
 }
 
-MMVerifyStandard.install = function (db) {
-    return db.plugins.verify || (db.plugins.verify = new MMVerifyStandard(db));
-};
+MMOM.Database.registerAnalyzer('verifier', MMVerifyStandard);
 
 // TODO: use "data" more systematically so that e.g. the math strings are displayed on unification and dv failure
 MMVerifyStandard.prototype.proofError = function (seg, i, code, data) {
@@ -442,5 +440,4 @@ MMVerifyStandard.prototype.verify = function (segix) {
     }
 };
 
-return MMVerifyStandard;
 });

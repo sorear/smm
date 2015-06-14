@@ -6,8 +6,8 @@ var rl = require('readline').createInterface({
 });
 
 var MMOM = require('../src/MMOM');
-var Scoper = require('../src/Scoper');
-var Verify = require('../src/Verify');
+require('../src/Scoper');
+require('../src/Verifier');
 var ConsoleErrorFormatter = require('../src/ConsoleErrorFormatter');
 
 rl.setPrompt('smm> ');
@@ -23,7 +23,7 @@ rl.on('line', function (l) {
         MMOM.parseAsync(match[1], function (fname) { return require('fs-promise').readFile(fname, 'utf8'); }).then(function (parsed) {
             db = parsed;
             console.log(ConsoleErrorFormatter(db.scanErrors)); //NOT API
-            console.log(ConsoleErrorFormatter(Scoper.install(db).errors)); //NOT API
+            console.log(ConsoleErrorFormatter(db.scoper.errors)); //NOT API
             rl.prompt();
         }, function (err) { console.log('should not get here',err); });
     }
@@ -50,7 +50,7 @@ rl.on('line', function (l) {
             console.log('not a $p');
         }
         else {
-            console.log(ConsoleErrorFormatter(Verify.install(db).verify(+match[1]))); //NOT API
+            console.log(ConsoleErrorFormatter(db.verifier.verify(+match[1]))); //NOT API
         }
         rl.prompt();
     }
