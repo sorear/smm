@@ -94,6 +94,22 @@ MMSource.prototype.lookupPos = function (pos) {
     return [ low+skip+1, pos-the_map[low]+1 ]; // "column" will be slightly off in the presence of tabs (evil) and supplementary characters (I care, but not much)
 };
 
+MMSource.prototype.getLine = function (lnum) {
+    if (!this.eolMaps) this.eolMaps = getEolArray(this.text);
+    var maps = this.eolMaps;
+    lnum--;
+    if (lnum < 0) return "";
+    var i = 0;
+    // could use binary search, but this array has O(1) bounded size
+    while (i < maps.length && lnum >= maps[i].length) {
+        lnum -= maps[i].length;
+        i++;
+    }
+
+    if (i === maps.length) return "";
+    return this.text.substring(maps[i][lnum], (lnum + 1 === maps[i].length) ? (i+1 === maps.length ? this.text.length : maps[i+1][0]) : maps[i][lnum+1]);
+};
+
 var SP = []; while (SP.length < 33) SP.push(false); SP[32] = SP[9] = SP[13] = SP[12] = SP[10] = true;
 
 // keep this in sync with MMScanner.getToken
@@ -245,7 +261,7 @@ function MMScanContext(root, resolver, sync) {
             src.text = resolve_data.get(src.name);
             if (src.text === undefined) {
                 src.text = '';
-                src.failed = true;
+                src.failed = 'Not in passed hash';
             }
         };
     }
