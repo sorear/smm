@@ -24,8 +24,10 @@ time('verify', function () {
         if (s.type === MMOM.Statement.PROVABLE) {
             verifd++;
             var err = db.verifier.verify(ix);
-            if (err.length) write(`${s.label} ERR\n`);
-            write(ConsoleErrorFormatter(err));
+            if (err.length) {
+                write(`${s.label} ERR\n`);
+                write(ConsoleErrorFormatter(err));
+            }
         }
     });
     write(`${verifd} $p\n`);
