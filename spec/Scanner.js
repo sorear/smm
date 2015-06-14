@@ -79,7 +79,7 @@ describe('scan $} token:', function () {
 describe('scan $c statement:', function () {
     src('$c a  b $.')
     it('has one statement', function () { expect(db.statements.length).toBe(1); });
-    it('is CONST statement', function () { expect(db.statements[0].type).toBe(MMOM.Statement.CONST); });
+    it('is CONSTANT statement', function () { expect(db.statements[0].type).toBe(MMOM.Statement.CONSTANT); });
     it('has math string', function () { expect(db.statements[0].math).toEqual(['a','b']); });
     it('has math positions (length)', function () { expect(db.statements[0].mathPos.length).toBe(4); });
     it('has math positions (1)', function () { expect(db.statements[0].mathPos[1]).toBe(3); });
@@ -90,7 +90,7 @@ describe('scan $c statement:', function () {
 describe('scan $c statement with embedded comment:', function () {
     src('$c a $( x y z $) b $.')
     it('has one statement', function () { expect(db.statements.length).toBe(1); });
-    it('is CONST statement', function () { expect(db.statements[0].type).toBe(MMOM.Statement.CONST); });
+    it('is CONSTANT statement', function () { expect(db.statements[0].type).toBe(MMOM.Statement.CONSTANT); });
     it('has math string', function () { expect(db.statements[0].math).toEqual(['a','b']); });
     it('has math positions (length)', function () { expect(db.statements[0].mathPos.length).toBe(4); });
     it('has math positions (1)', function () { expect(db.statements[0].mathPos[1]).toBe(3); });
@@ -101,7 +101,7 @@ describe('scan $c statement with embedded comment:', function () {
 describe('scan $d statement:', function () {
     src('$d a b $.')
     it('has one statement', function () { expect(db.statements.length).toBe(1); });
-    it('is DV statement', function () { expect(db.statements[0].type).toBe(MMOM.Statement.DV); });
+    it('is DISJOINT statement', function () { expect(db.statements[0].type).toBe(MMOM.Statement.DISJOINT); });
     it('has math string', function () { expect(db.statements[0].math).toEqual(['a','b']); });
     errs([]);
 });
@@ -109,7 +109,7 @@ describe('scan $d statement:', function () {
 describe('scan $v statement:', function () {
     src('$v a b $.')
     it('has one statement', function () { expect(db.statements.length).toBe(1); });
-    it('is VAR statement', function () { expect(db.statements[0].type).toBe(MMOM.Statement.VAR); });
+    it('is VARIABLE statement', function () { expect(db.statements[0].type).toBe(MMOM.Statement.VARIABLE); });
     it('has math string', function () { expect(db.statements[0].math).toEqual(['a','b']); });
     errs([]);
 });
@@ -185,7 +185,7 @@ describe('bad characters in comment:', function () {
 describe('token with bad characters skipped', function () {
     src('$c a b\u001fc d $.')
     it('statement count', function () { expect(db.statements.length).toBe(1); });
-    it('bad token skipped', function () { expect(seg(db,0)).toEqual([MMOM.Statement.CONST,'$c a b\u001fc d $.',['a','d'],null]); });
+    it('bad token skipped', function () { expect(seg(db,0)).toEqual([MMOM.Statement.CONSTANT,'$c a b\u001fc d $.',['a','d'],null]); });
     errs([ ['afile',5,'scanner','bad-character'] ]);
 });
 
@@ -268,14 +268,14 @@ describe('valid $a statement:', function () {
 describe('valid $e statement:', function () {
     src('   foo $e x y $.')
     it('has 1 statements', function () { expect(db.statements.length).toBe(1); });
-    it('first is $e', function () { expect(seg2(db,0)).toEqual([MMOM.Statement.ESSEN,'   foo $e x y $.',['x','y'],null,'foo']); });
+    it('first is $e', function () { expect(seg2(db,0)).toEqual([MMOM.Statement.ESSENTIAL,'   foo $e x y $.',['x','y'],null,'foo']); });
     errs([]);
 });
 
 describe('valid $f statement:', function () {
     src('   foo $f x y $.')
     it('has 1 statements', function () { expect(db.statements.length).toBe(1); });
-    it('first is $f', function () { expect(seg2(db,0)).toEqual([MMOM.Statement.FLOAT,'   foo $f x y $.',['x','y'],null,'foo']); });
+    it('first is $f', function () { expect(seg2(db,0)).toEqual([MMOM.Statement.FLOATING,'   foo $f x y $.',['x','y'],null,'foo']); });
     errs([]);
 });
 
@@ -312,7 +312,7 @@ var cases = [
         tag: "mid-statement file switch",
         src: { "afile": "$c a $[ bfile $] c $.", "bfile": "b $( sss $)" },
         seg: [
-            { typ: 'CONST', raw: "$c a $[ bfile $]b $( sss $) c $.", mat: ['a','b','c'], prf: null, lbl: null, map: ['afile',3,'bfile',0,'afile',17] },
+            { typ: 'CONSTANT', raw: "$c a $[ bfile $]b $( sss $) c $.", mat: ['a','b','c'], prf: null, lbl: null, map: ['afile',3,'bfile',0,'afile',17] },
         ],
         err: []
     },
@@ -321,7 +321,7 @@ var cases = [
         src: 'foo $a x y $c z $.',
         seg: [
             { typ: 'AXIOM', raw: 'foo $a x y', mat: ['x','y'], lbl: 'foo', prf: null },
-            { typ: 'CONST', raw: ' $c z $.', mat: ['z'], lbl: null, prf: null },
+            { typ: 'CONSTANT', raw: ' $c z $.', mat: ['z'], lbl: null, prf: null },
         ],
         err: [['afile',11,'scanner','nonterminated-math']],
     },
@@ -330,7 +330,7 @@ var cases = [
         src: 'foo $p x y $c z $.',
         seg: [
             { typ: 'PROVABLE', raw: 'foo $p x y', mat: ['x','y'], lbl: 'foo', prf: [] },
-            { typ: 'CONST', raw: ' $c z $.', mat: ['z'], lbl: null, prf: null },
+            { typ: 'CONSTANT', raw: ' $c z $.', mat: ['z'], lbl: null, prf: null },
         ],
         err: [['afile',11,'scanner','nonterminated-math']],
     },
@@ -339,7 +339,7 @@ var cases = [
         src: 'foo $p x y $= w $c z $.',
         seg: [
             { typ: 'PROVABLE', raw: 'foo $p x y $= w', mat: ['x','y'], lbl: 'foo', prf: ['w'] },
-            { typ: 'CONST', raw: ' $c z $.', mat: ['z'], lbl: null, prf: null },
+            { typ: 'CONSTANT', raw: ' $c z $.', mat: ['z'], lbl: null, prf: null },
         ],
         err: [['afile',16,'scanner','nonterminated-proof']],
     },

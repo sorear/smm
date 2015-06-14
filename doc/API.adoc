@@ -1,0 +1,84 @@
+== Stable(r) API
+
+=== General
+
+SMM stores the state of a Metamath database as an instance of the `MMOM.Database` class.
+A database represents a sequence of zero or more individually well-formed statements of the Metamath language.
+A database can legally represent states which are *jointly* invalid, such as a database containing a proof but not some of the steps the proof depends on.
+Individual statements are represented by instances of `MMOM.Statement`; they are *immutable* and do not know their context.
+Databases are modified by calling methods on the database to insert statements, remove statements, and replace statements with modified versions.
+
+Statements in SMM are the statements defined in the Metamath specification, plus SMM-specific statement types `COMMENT`, `INCLUDE`, `BOGUS`, and `EOF`;
+these statement types have no effect on the mathematical content of the database, but serve to hold text during parsing that does not naturally correspond to any statement.
+SMM always knows the character data corresponding to a statement.
+It is impossible to create a statement without making *some* decision about the whitespace that would be used to write that statement to a file.
+Statements own their leading whitespace.
+Whitespace at the end of the file is owned by the special `EOF` statement.
+Comments are treated as whitespace if found inside statements, but are promoted to statements in their own right if they appear between statements.
+
+Several SMM modules function by installing new methods on prototypes from other modules.
+Since modifying prototypes after optimized code generation is problematic, try to load all the modules you will use as early as possible.
+
+=== Parsing
+
+    database = MMOM.parseSync('filename', '$( file content $)')
+
+Call `parseSync` with two strings to parse a database which is already loaded as a string.
+Returns a `MMOM.Database` instance.
+The filename will be used for error messages (also, `$[` will ignore that filename but give errors for all others).
+Never throws, returns errors in the database object.
+
+    database = MMOM.parseSync('file1',
+        new Map().set('file1','$[ file2 $]').set('file2',''));
+
+The second argument to `parseSync` may be a `Map` if multiple files are used.
+
+    database = MMOM.parseSync('file1', filename => 'foo');
+
+The second argument to `parseSync` may be a function, which will be passed a file name and must return a string or throw an exception.
+Exceptions will be wrapped into `failed-to-read` errors.
+
+    MMOM.parseAsync('file1', filename =>
+        fetch(filename).then(rpy => rpy.text())).then(db => ... );
+
+`parseAsync` functions like `parseSync` except that only the function form is supported, the function is expected to return a promise, and a promise is returned at the end.
+As `parseSync` never throws, the promise returned from `parseAsync` never rejects.
+
+The parsing process will attempt to recover from arbitrary errors in the source, and the resulting database will contain only valid statements.
+Some statements will be repaired, those which cannot will be turned into `BOGUS` type statements.
+However, a database with parsing errors cannot be modified, due to the difficulty in updating the parsing error data after changes.
+
+=== Statements
+
+    count = database.statementCount;
+    statement = database.statement(42);
+
+A database has a `statementCount` property and a `statement` reader method.
+Currently all database access is mediated by statement indices.
+This is problematic as when an insert or delete is done, statement indices are invalidated.
+It is likely that a future version of SMM will use another technique to record statement positions;
+`statement(N)` will still be supported, but will suffer an O(n) penalty to build an index.
+
+Statements are immutable.
+To change a database, splice in new statements; do not attempt to modify existing ones.
+
+    statement.type === MMOM.Statement.OPEN
+    statement.type === MMOM.Statement.CLOSE
+    statement.type === MMOM.Statement.CONSTANT
+    statement.type === MMOM.Statement.VARIABLE
+    statement.type === MMOM.Statement.DISJOINT
+    statement.type === MMOM.Statement.ESSENTIAL
+    statement.type === MMOM.Statement.FLOATING
+    statement.type === MMOM.Statement.AXIOM
+    statement.type === MMOM.Statement.PROVABLE
+
+Statements have a type property, which is equal to the constants above for real statements.
+Fake statements also have types, but their number and roles are not currently considered stable.
+
+    string = statement.label
+    arrayString = statement.math
+    arrayString = statement.proof
+
+Accessors for the fundamental parts of a statement.
+`math` and `proof` may be `null` on statement types for which they are not applicable;
+when they are applicable, they will always be present even if empty.

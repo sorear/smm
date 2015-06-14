@@ -237,14 +237,14 @@ MMOMStatement.EOF = 1;
 MMOMStatement.COMMENT = 2;
 MMOMStatement.OPEN = 3;
 MMOMStatement.CLOSE = 4;
-MMOMStatement.CONST = 5;
-MMOMStatement.VAR = 6;
-MMOMStatement.DV = 7;
+MMOMStatement.CONSTANT = 5;
+MMOMStatement.VARIABLE = 6;
+MMOMStatement.DISJOINT = 7;
 MMOMStatement.AXIOM = 8;
 MMOMStatement.PROVABLE = 9;
 MMOMStatement.BOGUS = 10;
-MMOMStatement.ESSEN = 11;
-MMOMStatement.FLOAT = 12;
+MMOMStatement.ESSENTIAL = 11;
+MMOMStatement.FLOATING = 12;
 MMOMStatement.INCLUDE = 13;
 
 var S_IDLE=1,S_LABEL=2,S_MATH=3,S_PROOF=4;
@@ -391,16 +391,16 @@ MMOMScanner.prototype.newSegment = function (lt_index) {
 };
 
 var KW_DATA = {
-    '$a': { type: MMOMStatement.AXIOM,    label: true,  atomic: false },
-    '$p': { type: MMOMStatement.PROVABLE, label: true,  atomic: false },
-    '$c': { type: MMOMStatement.CONST,    label: false, atomic: false },
-    '$d': { type: MMOMStatement.DV,       label: false, atomic: false },
-    '$e': { type: MMOMStatement.ESSEN,    label: true,  atomic: false },
-    '$f': { type: MMOMStatement.FLOAT,    label: true,  atomic: false },
-    '$v': { type: MMOMStatement.VAR,      label: false, atomic: false },
-    '${': { type: MMOMStatement.OPEN,     label: false, atomic: true },
-    '$}': { type: MMOMStatement.CLOSE,    label: false, atomic: true },
-    '':   { type: MMOMStatement.EOF,      label: false, atomic: true },
+    '$a': { type: MMOMStatement.AXIOM,     label: true,  atomic: false },
+    '$p': { type: MMOMStatement.PROVABLE,  label: true,  atomic: false },
+    '$c': { type: MMOMStatement.CONSTANT,  label: false, atomic: false },
+    '$d': { type: MMOMStatement.DISJOINT,  label: false, atomic: false },
+    '$e': { type: MMOMStatement.ESSENTIAL, label: true,  atomic: false },
+    '$f': { type: MMOMStatement.FLOATING,  label: true,  atomic: false },
+    '$v': { type: MMOMStatement.VARIABLE,  label: false, atomic: false },
+    '${': { type: MMOMStatement.OPEN,      label: false, atomic: true },
+    '$}': { type: MMOMStatement.CLOSE,     label: false, atomic: true },
+    '':   { type: MMOMStatement.EOF,       label: false, atomic: true },
 };
 
 MMOMScanner.prototype.scan = function () {
@@ -653,6 +653,9 @@ function MMOMDatabase() {
     this.scanErrors = null;
     this.plugins = {};
 }
+
+Object.defineProperty(MMOMDatabase, 'statementCount', { get: function () { return this.statements.length; } });
+MMOMDatabase.prototype.statement = function (ix) { return this.statements[ix]; };
 
 function parseSync(name, resolver) {
     if (typeof resolver === 'string') {

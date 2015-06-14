@@ -62,11 +62,11 @@ var PROVABLE = MMOM.Statement.PROVABLE;
 var AXIOM = MMOM.Statement.AXIOM;
 var OPEN = MMOM.Statement.OPEN;
 var CLOSE = MMOM.Statement.CLOSE;
-var VAR = MMOM.Statement.VAR;
-var CONST = MMOM.Statement.CONST;
-var ESSEN = MMOM.Statement.ESSEN;
-var FLOAT = MMOM.Statement.FLOAT;
-var DV = MMOM.Statement.DV;
+var VARIABLE = MMOM.Statement.VARIABLE;
+var CONSTANT = MMOM.Statement.CONSTANT;
+var ESSENTIAL = MMOM.Statement.ESSENTIAL;
+var FLOATING = MMOM.Statement.FLOATING;
+var DISJOINT = MMOM.Statement.DISJOINT;
 
 MMScoper.prototype.getPos = function (pos,ix) {
     return pos.slice(2*ix,2*ix+2);
@@ -128,7 +128,7 @@ MMScoper.prototype.mathCheck = function (segix) {
             continue;
         }
 
-        if (segtab[sym.math[sym.math.length - 1]].type === VAR) {
+        if (segtab[sym.math[sym.math.length - 1]].type === VARIABLE) {
             if (i === 0) {
                 this.addError(EL.math(seg, i), 'eap-first-not-const');
                 // can only get away with this impurity because it's first
@@ -182,7 +182,7 @@ MMScoper.prototype.scan = function () {
                 }
                 break;
 
-            case CONST:
+            case CONSTANT:
                 if (seg.math.length === 0)
                     this.addError(EL.statement(seg), 'const-empty');
                 if (scope_ed_stack.length)
@@ -207,7 +207,7 @@ MMScoper.prototype.scan = function () {
                 }
                 break;
 
-            case VAR:
+            case VARIABLE:
                 if (seg.math.length === 0)
                     this.addError(EL.statement(seg), 'var-empty');
                 ends_ary[segix] = HIGHSEG;
@@ -231,7 +231,7 @@ MMScoper.prototype.scan = function () {
                 open_vf_stack.push(segix);
                 break;
 
-            case ESSEN:
+            case ESSENTIAL:
                 this.labelCheck(segix);
                 this.mathCheck(segix);
                 chains_ary[segix] = open_ed_ptr;
@@ -240,7 +240,7 @@ MMScoper.prototype.scan = function () {
                 open_ed_ptr = segix;
                 break;
 
-            case FLOAT:
+            case FLOATING:
                 this.labelCheck(segix);
                 open_vf_stack.push(segix);
                 ends_ary[segix] = HIGHSEG;
@@ -249,12 +249,12 @@ MMScoper.prototype.scan = function () {
                     break;
                 }
                 sym = this.getSym(seg.math[0]);
-                if (!sym.math.length || ends_ary[sym.math[sym.math.length - 1]] !== HIGHSEG || statements[sym.math[sym.math.length - 1]].type !== CONST) {
+                if (!sym.math.length || ends_ary[sym.math[sym.math.length - 1]] !== HIGHSEG || statements[sym.math[sym.math.length - 1]].type !== CONSTANT) {
                     this.addError(EL.math(seg, 0), 'float-not-active-const');
                     break;
                 }
                 sym = this.getSym(seg.math[1]);
-                if (!sym.math.length || ends_ary[sym.math[sym.math.length - 1]] !== HIGHSEG || statements[sym.math[sym.math.length - 1]].type !== VAR) {
+                if (!sym.math.length || ends_ary[sym.math[sym.math.length - 1]] !== HIGHSEG || statements[sym.math[sym.math.length - 1]].type !== VARIABLE) {
                     this.addError(EL.math(seg, 1), 'float-not-active-var');
                     break;
                 }
@@ -265,7 +265,7 @@ MMScoper.prototype.scan = function () {
                 sym.float.push(segix);
                 break;
 
-            case DV:
+            case DISJOINT:
                 if (seg.math.length < 2) {
                     this.addError(EL.statement(seg), 'dv-short');
                     break;
@@ -278,7 +278,7 @@ MMScoper.prototype.scan = function () {
                     }
                     used.set(seg.math[i],i);
                     sym = this.getSym(seg.math[i]);
-                    if (sym.math.length && statements[sym.math[sym.math.length - 1]].type === VAR && ends_ary[sym.math[sym.math.length - 1]] === HIGHSEG) {
+                    if (sym.math.length && statements[sym.math[sym.math.length - 1]].type === VARIABLE && ends_ary[sym.math[sym.math.length - 1]] === HIGHSEG) {
                         // active $v
                     }
                     else {
@@ -379,7 +379,7 @@ function MMFrame(scoper, ix) {
     if (!this.hasFrame) return;
 
     for (j = scoper.chains_ary[ix]; j >= 0; j = scoper.chains_ary[j]) {
-        if (statements[j].type === ESSEN) {
+        if (statements[j].type === ESSENTIAL) {
             essen_ix.push(j);
             if (!statements[j].math.length) {
                 this.errors.push(EL.statement(seg).error('frame-builder', 'empty-hyp', { hyp: EL.statement(statements[j]), ref: EL.statement(seg) }));
@@ -422,7 +422,7 @@ function MMFrame(scoper, ix) {
 
         j = sym.float[j];
 
-        if (statements[j].type !== FLOAT || j >= ix || ix >= scoper.ends_ary[j]) {
+        if (statements[j].type !== FLOATING || j >= ix || ix >= scoper.ends_ary[j]) {
             this.errors.push(EL.statement(seg).error('frame-builder', 'inactive-float', { 'var': tok, ref: EL.statement(seg) }));
             continue;
         }

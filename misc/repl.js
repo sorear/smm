@@ -22,8 +22,8 @@ rl.on('line', function (l) {
         rl.pause();
         MMOM.parseAsync(match[1], function (fname) { return require('fs-promise').readFile(fname, 'utf8'); }).then(function (parsed) {
             db = parsed;
-            console.log(ConsoleErrorFormatter(db.scanErrors));
-            console.log(ConsoleErrorFormatter(Scoper.install(db).errors));
+            console.log(ConsoleErrorFormatter(db.scanErrors)); //NOT API
+            console.log(ConsoleErrorFormatter(Scoper.install(db).errors)); //NOT API
             rl.prompt();
         }, function (err) { console.log('should not get here',err); });
     }
@@ -35,7 +35,7 @@ rl.on('line', function (l) {
             console.log('no database');
         }
         else {
-            console.log(Scoper.install(db).getSym(match[1]));
+            console.log(Scoper.install(db).getSym(match[1])); //NOT API
         }
         rl.prompt();
     }
@@ -43,14 +43,14 @@ rl.on('line', function (l) {
         if (!db) {
             console.log('no database');
         }
-        else if (+match[1] >= db.statements.length) {
+        else if (+match[1] >= db.statementCount) {
             console.log('out of range');
         }
-        else if (db.statements[+match[1]].type !== MMOM.Statement.PROVABLE) {
+        else if (db.statement(+match[1]).type !== MMOM.Statement.PROVABLE) {
             console.log('not a $p');
         }
         else {
-            console.log(ConsoleErrorFormatter(Verify.install(db).verify(+match[1])));
+            console.log(ConsoleErrorFormatter(Verify.install(db).verify(+match[1]))); //NOT API
         }
         rl.prompt();
     }
