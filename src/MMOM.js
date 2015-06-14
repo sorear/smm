@@ -251,20 +251,6 @@ var S_IDLE=1,S_LABEL=2,S_MATH=3,S_PROOF=4;
 
 // A scan context is a stateless object which survives the scan so as to support later lazy rescans.
 function MMOMScanContext(root, resolver, sync) {
-    if (typeof resolver === 'string') {
-        resolver = new Map([[ root, resolver ]]);
-    }
-    var resolve_data;
-    if (typeof resolver === 'object') {
-        resolve_data = resolver;
-        resolver = function (src) {
-            src.text = resolve_data.get(src.name);
-            if (src.text === undefined) {
-                src.text = '';
-                src.failed = 'Not in passed hash';
-            }
-        };
-    }
     this.sync = sync;
     this.resolver = resolver;
     this.sources = new Map();
@@ -668,8 +654,32 @@ function MMOMDatabase() {
     this.plugins = {};
 }
 
-MMOMScanner.parseSync = function (name, resolver) {
-    return new MMOMScanner(new MMOMScanContext(name, resolver, true).initialZone(name)).scan();
+function parseSync(name, resolver) {
+    if (typeof resolver === 'string') {
+        resolver = new Map([[ name, resolver ]]);
+    }
+
+    function resolve(source) {
+        if (resolver instanceof Map) {
+            source.text = resolver.get(source.name);
+            if (source.text === undefined) {
+                source.text = '';
+                source.failed = 'Not in passed hash';
+            }
+        }
+        else {
+            try {
+                source.text = resolver(source.name);
+                if (typeof source.text !== 'string') throw new Error('resolver returned non-string');
+            }
+            catch (e) {
+                source.failed = e || 'false';
+                source.text = '';
+            }
+        }
+    }
+
+    return new MMOMScanner(new MMOMScanContext(name, resolve, true).initialZone(name)).scan();
 };
 
 return {
@@ -680,6 +690,7 @@ return {
     Scanner: MMOMScanner,
     Database: MMOMDatabase,
     ScanContext: MMOMScanContext,
+    parseSync: parseSync,
 };
 
 });

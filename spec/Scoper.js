@@ -3,7 +3,7 @@ var Scoper = require('../src/Scoper.js');
 var db;
 function src(x) {
     beforeAll(function () {
-        db = MMOM.Scanner.parseSync('afile',x);
+        db = MMOM.parseSync('afile',x);
         if (db.scanErrors.length) throw new Error('unexpected scan errors in scoper pass');
         Scoper.install(db);
     });

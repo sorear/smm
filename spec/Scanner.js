@@ -2,7 +2,7 @@ var MMOM = require('../src/MMOM.js');
 var db;
 function src(x) {
     if (typeof x === 'object' && !(x instanceof Map)) { x = new Map(Object.keys(x).map(function (k) { return [k,x[k]]; })); }
-    beforeAll(function () { db = MMOM.Scanner.parseSync('afile',x); });
+    beforeAll(function () { db = MMOM.parseSync('afile',x); });
 }
 function deep(x) { console.log(require('util').inspect(x,{depth:null,colors:true})); }
 function err(db,i) { var e = db.scanErrors[i]; return e ? [ e.location.source.name, e.location.from, e.category, e.code ] : []; }
@@ -123,7 +123,7 @@ describe('scan w/ Map argument:', function () {
 
 describe('scan w/ resolver argument:', function () {
     var name;
-    src(function (src) { name = src.name; src.text = '${'; })
+    src(function (src) { name = src; return '${'; })
     it('resolver got expected result', function () { expect(name).toBe('afile'); });
     it('has one statement', function () { expect(db.statements.length).toBe(1); });
     it('containing source', function () { expect(db.statements[0].raw).toBe('${'); });

@@ -4,7 +4,7 @@ var Verify = require('../src/Verify.js');
 var db, vErr;
 function src(x) {
     beforeAll(function () {
-        db = MMOM.Scanner.parseSync('afile',x);
+        db = MMOM.parseSync('afile',x);
         if (db.scanErrors.length) throw new Error('unexpected scan errors');
         vErr = Verify.install(db).verify( Scoper.install(db).getSym('test').labelled );
     });
