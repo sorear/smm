@@ -1,8 +1,8 @@
-var mmom = require('../src/MMOM.js');
+var MMOM = require('../src/MMOM.js');
 var db;
 function src(x) {
     if (typeof x === 'object' && !(x instanceof Map)) { x = new Map(Object.keys(x).map(function (k) { return [k,x[k]]; })); }
-    beforeAll(function () { db = mmom.Scanner.parseSync('afile',x); });
+    beforeAll(function () { db = MMOM.Scanner.parseSync('afile',x); });
 }
 function deep(x) { console.log(require('util').inspect(x,{depth:null,colors:true})); }
 function err(db,i) { var e = db.scanErrors[i]; return e ? [ e.location.source.name, e.location.from, e.category, e.code ] : []; }
@@ -19,7 +19,7 @@ function errs(es) {
 function segs(ss) {
     it(`has ${ss.length} segments`, function () { expect(db.segments.length).toBe(ss.length); });
     ss.forEach(function (s,ix) {
-        it(`segment ${ix}=${s.typ}`, function () { expect(seg2(db,ix)).toEqual([mmom.Segment[s.typ],s.raw,s.mat,s.prf,s.lbl]); });
+        it(`segment ${ix}=${s.typ}`, function () { expect(seg2(db,ix)).toEqual([MMOM.Segment[s.typ],s.raw,s.mat,s.prf,s.lbl]); });
         if (s.stp) { it(`segment ${ix}/startPos`, function () { expect(pos(db,ix,'startPos')).toEqual(s.stp); }); }
         if (s.map) { it(`segment ${ix}/mathPos`, function () { expect(pos(db,ix,'mathPos')).toEqual(s.map); }); }
         if (s.prp) { it(`segment ${ix}/proofPos`, function () { expect(pos(db,ix,'proofPos')).toEqual(s.prp); }); }
@@ -28,7 +28,7 @@ function segs(ss) {
 
 describe('scan empty database:', function () {
     src('')
-    it('is a mmom.Database', function () { expect(db instanceof mmom.Database).toBe(true); });
+    it('is a MMOM.Database', function () { expect(db instanceof MMOM.Database).toBe(true); });
     it('has no segments', function () { expect(db.segments.length).toBe(0); });
     errs([]);
 });
@@ -36,7 +36,7 @@ describe('scan empty database:', function () {
 describe('scan whitespace:', function () {
     src(' \t')
     it('has one segment', function () { expect(db.segments.length).toBe(1); });
-    it('is EOF segment', function () { expect(db.segments[0].type).toBe(mmom.Segment.EOF); });
+    it('is EOF segment', function () { expect(db.segments[0].type).toBe(MMOM.Segment.EOF); });
     it('containing source', function () { expect(db.segments[0].raw).toBe(' \t'); });
     errs([]);
 });
@@ -44,7 +44,7 @@ describe('scan whitespace:', function () {
 describe('scan ${ token:', function () {
     src('${')
     it('has one segment', function () { expect(db.segments.length).toBe(1); });
-    it('is OPEN segment', function () { expect(db.segments[0].type).toBe(mmom.Segment.OPEN); });
+    it('is OPEN segment', function () { expect(db.segments[0].type).toBe(MMOM.Segment.OPEN); });
     it('containing source', function () { expect(db.segments[0].raw).toBe('${'); });
     errs([]);
 });
@@ -52,7 +52,7 @@ describe('scan ${ token:', function () {
 describe('scan ${ token with leading whitespace:', function () {
     src('\n\n${')
     it('has one segment', function () { expect(db.segments.length).toBe(1); });
-    it('is OPEN segment', function () { expect(db.segments[0].type).toBe(mmom.Segment.OPEN); });
+    it('is OPEN segment', function () { expect(db.segments[0].type).toBe(MMOM.Segment.OPEN); });
     it('containing source', function () { expect(db.segments[0].raw).toBe('\n\n${'); });
     it('has correct token position', function () { expect(db.segments[0].startPos[1]).toBe(2); });
     errs([]);
@@ -61,10 +61,10 @@ describe('scan ${ token with leading whitespace:', function () {
 describe('scan ${ token with trailing whitespace:', function () {
     src('${\n\n')
     it('has two segments', function () { expect(db.segments.length).toBe(2); });
-    it('is OPEN segment', function () { expect(db.segments[0].type).toBe(mmom.Segment.OPEN); });
+    it('is OPEN segment', function () { expect(db.segments[0].type).toBe(MMOM.Segment.OPEN); });
     it('containing source', function () { expect(db.segments[0].raw).toBe('${'); });
     it('has correct token position', function () { expect(db.segments[0].startPos[1]).toBe(0); });
-    it('is EOF segment', function () { expect(db.segments[1].type).toBe(mmom.Segment.EOF); });
+    it('is EOF segment', function () { expect(db.segments[1].type).toBe(MMOM.Segment.EOF); });
     it('containing source', function () { expect(db.segments[1].raw).toBe('\n\n'); });
     errs([]);
 });
@@ -72,14 +72,14 @@ describe('scan ${ token with trailing whitespace:', function () {
 describe('scan $} token:', function () {
     src('$}')
     it('has one segment', function () { expect(db.segments.length).toBe(1); });
-    it('is CLOSE segment', function () { expect(db.segments[0].type).toBe(mmom.Segment.CLOSE); });
+    it('is CLOSE segment', function () { expect(db.segments[0].type).toBe(MMOM.Segment.CLOSE); });
     errs([]);
 });
 
 describe('scan $c statement:', function () {
     src('$c a  b $.')
     it('has one segment', function () { expect(db.segments.length).toBe(1); });
-    it('is CONST segment', function () { expect(db.segments[0].type).toBe(mmom.Segment.CONST); });
+    it('is CONST segment', function () { expect(db.segments[0].type).toBe(MMOM.Segment.CONST); });
     it('has math string', function () { expect(db.segments[0].math).toEqual(['a','b']); });
     it('has math positions (length)', function () { expect(db.segments[0].mathPos.length).toBe(4); });
     it('has math positions (1)', function () { expect(db.segments[0].mathPos[1]).toBe(3); });
@@ -90,7 +90,7 @@ describe('scan $c statement:', function () {
 describe('scan $c statement with embedded comment:', function () {
     src('$c a $( x y z $) b $.')
     it('has one segment', function () { expect(db.segments.length).toBe(1); });
-    it('is CONST segment', function () { expect(db.segments[0].type).toBe(mmom.Segment.CONST); });
+    it('is CONST segment', function () { expect(db.segments[0].type).toBe(MMOM.Segment.CONST); });
     it('has math string', function () { expect(db.segments[0].math).toEqual(['a','b']); });
     it('has math positions (length)', function () { expect(db.segments[0].mathPos.length).toBe(4); });
     it('has math positions (1)', function () { expect(db.segments[0].mathPos[1]).toBe(3); });
@@ -101,7 +101,7 @@ describe('scan $c statement with embedded comment:', function () {
 describe('scan $d statement:', function () {
     src('$d a b $.')
     it('has one segment', function () { expect(db.segments.length).toBe(1); });
-    it('is DV segment', function () { expect(db.segments[0].type).toBe(mmom.Segment.DV); });
+    it('is DV segment', function () { expect(db.segments[0].type).toBe(MMOM.Segment.DV); });
     it('has math string', function () { expect(db.segments[0].math).toEqual(['a','b']); });
     errs([]);
 });
@@ -109,7 +109,7 @@ describe('scan $d statement:', function () {
 describe('scan $v statement:', function () {
     src('$v a b $.')
     it('has one segment', function () { expect(db.segments.length).toBe(1); });
-    it('is VAR segment', function () { expect(db.segments[0].type).toBe(mmom.Segment.VAR); });
+    it('is VAR segment', function () { expect(db.segments[0].type).toBe(MMOM.Segment.VAR); });
     it('has math string', function () { expect(db.segments[0].math).toEqual(['a','b']); });
     errs([]);
 });
@@ -133,9 +133,9 @@ describe('scan w/ resolver argument:', function () {
 describe('simple file inclusion:', function () {
     src((new Map).set('afile','$[ bfile $]').set('bfile','$}'))
     it('has two segments', function () { expect(db.segments.length).toBe(2); });
-    it('first is include per se', function () { expect(db.segments[0].type).toBe(mmom.Segment.INCLUDE); });
+    it('first is include per se', function () { expect(db.segments[0].type).toBe(MMOM.Segment.INCLUDE); });
     it('containing source', function () { expect(db.segments[0].raw).toBe('$[ bfile $]'); });
-    it('second is close', function () { expect(db.segments[1].type).toBe(mmom.Segment.CLOSE); });
+    it('second is close', function () { expect(db.segments[1].type).toBe(MMOM.Segment.CLOSE); });
     it('containing source', function () { expect(db.segments[1].raw).toBe('$}'); });
     errs([]);
 });
@@ -143,7 +143,7 @@ describe('simple file inclusion:', function () {
 describe('inclusion of root file is ignored:', function () {
     src((new Map).set('afile','$[ afile $]'))
     it('has one segments', function () { expect(db.segments.length).toBe(1); });
-    it('first is include per se', function () { expect(db.segments[0].type).toBe(mmom.Segment.INCLUDE); });
+    it('first is include per se', function () { expect(db.segments[0].type).toBe(MMOM.Segment.INCLUDE); });
     it('containing source', function () { expect(db.segments[0].raw).toBe('$[ afile $]'); });
     errs([]);
 });
@@ -151,7 +151,7 @@ describe('inclusion of root file is ignored:', function () {
 describe('inclusion of nonexistant file:', function () {
     src((new Map).set('afile','$[ bfile $]'))
     it('has one segments', function () { expect(db.segments.length).toBe(1); });
-    it('first is include per se', function () { expect(db.segments[0].type).toBe(mmom.Segment.INCLUDE); });
+    it('first is include per se', function () { expect(db.segments[0].type).toBe(MMOM.Segment.INCLUDE); });
     it('containing source', function () { expect(db.segments[0].raw).toBe('$[ bfile $]'); });
     errs([['bfile',0,'scanner','failed-to-read']]);
 });
@@ -159,9 +159,9 @@ describe('inclusion of nonexistant file:', function () {
 describe('comment spanning include:', function () {
     src((new Map).set('afile','$[ bfile $] text $)').set('bfile','$( comment'))
     it('has 3 segments', function () { expect(db.segments.length).toBe(3); });
-    it('first is include', function () { expect(seg(db,0)).toEqual([mmom.Segment.INCLUDE,'$[ bfile $]',null,null]); });
-    it('second is comment fragment in an EOF', function () { expect(seg(db,1)).toEqual([mmom.Segment.EOF,'$( comment',null,null]); });
-    it('third is trailing portion of wrapping file in an EOF', function () { expect(seg(db,2)).toEqual([mmom.Segment.EOF,' text $)',null,null]); });
+    it('first is include', function () { expect(seg(db,0)).toEqual([MMOM.Segment.INCLUDE,'$[ bfile $]',null,null]); });
+    it('second is comment fragment in an EOF', function () { expect(seg(db,1)).toEqual([MMOM.Segment.EOF,'$( comment',null,null]); });
+    it('third is trailing portion of wrapping file in an EOF', function () { expect(seg(db,2)).toEqual([MMOM.Segment.EOF,' text $)',null,null]); });
     it('nonterminated comment error', function () { expect(err(db,0)).toEqual(['bfile',10,'scanner','eof-in-comment']); });
     it('loose $) error', function () { expect(err(db,1)).toEqual(['afile',17,'scanner','loose-comment-end']); });
     it('spurious label error', function () { expect(err(db,2)).toEqual(['afile',19,'scanner','spurious-label']); });
@@ -170,7 +170,7 @@ describe('comment spanning include:', function () {
 describe('nested comment:', function () {
     src('$( foo $( bar $)')
     it('has one segment', function () { expect(db.segments.length).toBe(1); });
-    it('first is comment', function () { expect(seg(db,0)).toEqual([mmom.Segment.COMMENT,'$( foo $( bar $)',null,null]); });
+    it('first is comment', function () { expect(seg(db,0)).toEqual([MMOM.Segment.COMMENT,'$( foo $( bar $)',null,null]); });
     errs([['afile',7,'scanner','pseudo-nested-comment']]);
 });
 
@@ -185,35 +185,35 @@ describe('bad characters in comment:', function () {
 describe('token with bad characters skipped', function () {
     src('$c a b\u001fc d $.')
     it('segment count', function () { expect(db.segments.length).toBe(1); });
-    it('bad token skipped', function () { expect(seg(db,0)).toEqual([mmom.Segment.CONST,'$c a b\u001fc d $.',['a','d'],null]); });
+    it('bad token skipped', function () { expect(seg(db,0)).toEqual([MMOM.Segment.CONST,'$c a b\u001fc d $.',['a','d'],null]); });
     errs([ ['afile',5,'scanner','bad-character'] ]);
 });
 
 describe('not a nested comment:', function () {
     src('$( x$( $a $q $)')
     it('has one segment', function () { expect(db.segments.length).toBe(1); });
-    it('first is comment', function () { expect(seg(db,0)).toEqual([mmom.Segment.COMMENT,'$( x$( $a $q $)',null,null]); });
+    it('first is comment', function () { expect(seg(db,0)).toEqual([MMOM.Segment.COMMENT,'$( x$( $a $q $)',null,null]); });
     errs([['afile',3,'scanner','pseudo-nested-comment']]);
 });
 
 describe('false comment end:', function () {
     src('$( x$)x $)')
     it('has one segment', function () { expect(db.segments.length).toBe(1); });
-    it('first is comment', function () { expect(seg(db,0)).toEqual([mmom.Segment.COMMENT,'$( x$)x $)',null,null]); });
+    it('first is comment', function () { expect(seg(db,0)).toEqual([MMOM.Segment.COMMENT,'$( x$)x $)',null,null]); });
     errs([ ['afile',3,'scanner','pseudo-comment-end'] ]);
 });
 
 describe('unterminated directive:', function () {
     src('$[')
     it('has one segment', function () { expect(db.segments.length).toBe(1); });
-    it('first is EOF (uninterpreted)', function () { expect(seg(db,0)).toEqual([mmom.Segment.EOF,'$[',null,null]); });
+    it('first is EOF (uninterpreted)', function () { expect(seg(db,0)).toEqual([MMOM.Segment.EOF,'$[',null,null]); });
     errs([ ['afile',2,'scanner','unterminated-directive'] ]);
 });
 
 describe('bad/missing filename:', function () {
     src('$[ $foo $]')
     it('has one segment', function () { expect(db.segments.length).toBe(1); });
-    it('first is EOF (uninterpreted)', function () { expect(seg(db,0)).toEqual([mmom.Segment.EOF,'$[ $foo $]',null,null]); });
+    it('first is EOF (uninterpreted)', function () { expect(seg(db,0)).toEqual([MMOM.Segment.EOF,'$[ $foo $]',null,null]); });
     errs([
         ['afile',3,'scanner','dollar-in-filename'],
         ['afile',8,'scanner','missing-filename'],
@@ -223,16 +223,16 @@ describe('bad/missing filename:', function () {
 describe('two tokens in include:', function () {
     src('$[ afile bfile $]')
     it('has one segment', function () { expect(db.segments.length).toBe(1); });
-    it('first is include (extra token ignored)', function () { expect(seg(db,0)).toEqual([mmom.Segment.INCLUDE,'$[ afile bfile $]',null,null]); });
+    it('first is include (extra token ignored)', function () { expect(seg(db,0)).toEqual([MMOM.Segment.INCLUDE,'$[ afile bfile $]',null,null]); });
     errs([['afile',9,'scanner','directive-too-long']]);
 });
 
 describe('attempt to span file end with directive:', function () {
     src(new Map().set('afile','$[ bfile $] $]').set('bfile','$[ cfile'))
     it('has three segments', function () { expect(db.segments.length).toBe(3); });
-    it('first is include', function () { expect(seg(db,0)).toEqual([mmom.Segment.INCLUDE,'$[ bfile $]',null,null]); });
-    it('second is uninterpretable', function () { expect(seg(db,1)).toEqual([mmom.Segment.EOF,'$[ cfile',null,null]); });
-    it('third is uninterpretable', function () { expect(seg(db,2)).toEqual([mmom.Segment.EOF,' $]',null,null]); });
+    it('first is include', function () { expect(seg(db,0)).toEqual([MMOM.Segment.INCLUDE,'$[ bfile $]',null,null]); });
+    it('second is uninterpretable', function () { expect(seg(db,1)).toEqual([MMOM.Segment.EOF,'$[ cfile',null,null]); });
+    it('third is uninterpretable', function () { expect(seg(db,2)).toEqual([MMOM.Segment.EOF,' $]',null,null]); });
     errs([
         ['bfile',8,'scanner','unterminated-directive'],
         ['afile',12,'scanner','loose-directive-end'],
@@ -242,14 +242,14 @@ describe('attempt to span file end with directive:', function () {
 describe('missing proof:', function () {
     src('foo $p x y $.')
     it('has 1 segments', function () { expect(db.segments.length).toBe(1); });
-    it('first is $p', function () { expect(seg2(db,0)).toEqual([mmom.Segment.PROVABLE,'foo $p x y $.',['x','y'],[],'foo']); });
+    it('first is $p', function () { expect(seg2(db,0)).toEqual([MMOM.Segment.PROVABLE,'foo $p x y $.',['x','y'],[],'foo']); });
     errs([ ['afile',11,'scanner','missing-proof'] ]);
 });
 
 describe('valid $p statement:', function () {
     src('   foo $p x y $= z $( k $) w $.')
     it('has 1 segments', function () { expect(db.segments.length).toBe(1); });
-    it('first is $p', function () { expect(seg2(db,0)).toEqual([mmom.Segment.PROVABLE,'   foo $p x y $= z $( k $) w $.',['x','y'],['z','w'],'foo']); });
+    it('first is $p', function () { expect(seg2(db,0)).toEqual([MMOM.Segment.PROVABLE,'   foo $p x y $= z $( k $) w $.',['x','y'],['z','w'],'foo']); });
     it('label position', function () { expect(pos(db,0,'startPos')).toEqual(['afile',3]); });
     it('math positions', function () { expect(pos(db,0,'mathPos')).toEqual(['afile',10,'afile',12]); });
     it('proof positions', function () { expect(pos(db,0,'proofPos')).toEqual(['afile',17,'afile',27]); });
@@ -259,7 +259,7 @@ describe('valid $p statement:', function () {
 describe('valid $a statement:', function () {
     src('   foo $a x y $.')
     it('has 1 segments', function () { expect(db.segments.length).toBe(1); });
-    it('first is $a', function () { expect(seg2(db,0)).toEqual([mmom.Segment.AXIOM,'   foo $a x y $.',['x','y'],null,'foo']); });
+    it('first is $a', function () { expect(seg2(db,0)).toEqual([MMOM.Segment.AXIOM,'   foo $a x y $.',['x','y'],null,'foo']); });
     it('label position', function () { expect(pos(db,0,'startPos')).toEqual(['afile',3]); });
     it('math positions', function () { expect(pos(db,0,'mathPos')).toEqual(['afile',10,'afile',12]); });
     errs([]);
@@ -268,42 +268,42 @@ describe('valid $a statement:', function () {
 describe('valid $e statement:', function () {
     src('   foo $e x y $.')
     it('has 1 segments', function () { expect(db.segments.length).toBe(1); });
-    it('first is $e', function () { expect(seg2(db,0)).toEqual([mmom.Segment.ESSEN,'   foo $e x y $.',['x','y'],null,'foo']); });
+    it('first is $e', function () { expect(seg2(db,0)).toEqual([MMOM.Segment.ESSEN,'   foo $e x y $.',['x','y'],null,'foo']); });
     errs([]);
 });
 
 describe('valid $f statement:', function () {
     src('   foo $f x y $.')
     it('has 1 segments', function () { expect(db.segments.length).toBe(1); });
-    it('first is $f', function () { expect(seg2(db,0)).toEqual([mmom.Segment.FLOAT,'   foo $f x y $.',['x','y'],null,'foo']); });
+    it('first is $f', function () { expect(seg2(db,0)).toEqual([MMOM.Segment.FLOAT,'   foo $f x y $.',['x','y'],null,'foo']); });
     errs([]);
 });
 
 describe('spurious proof:', function () {
     src('   foo $f x y $= z $.')
     it('has 1 segments', function () { expect(db.segments.length).toBe(1); });
-    it('first is $f', function () { expect(seg2(db,0)).toEqual([mmom.Segment.BOGUS,'   foo $f x y $= z $.',['x','y','z'],null,'foo']); });
+    it('first is $f', function () { expect(seg2(db,0)).toEqual([MMOM.Segment.BOGUS,'   foo $f x y $= z $.',['x','y','z'],null,'foo']); });
     errs([['afile',14,'scanner','spurious-proof']]);
 });
 
 describe('spurious proof 2:', function () {
     src('   foo $p x $= y $= z $.')
     it('has 1 segments', function () { expect(db.segments.length).toBe(1); });
-    it('first is discarded', function () { expect(seg2(db,0)).toEqual([mmom.Segment.BOGUS,'   foo $p x $= y $= z $.',['x'],['y','z'],'foo']); });
+    it('first is discarded', function () { expect(seg2(db,0)).toEqual([MMOM.Segment.BOGUS,'   foo $p x $= y $= z $.',['x'],['y','z'],'foo']); });
     errs([ ['afile',17,'scanner','spurious-proof'] ]);
 });
 
 describe('stray $. w/o label:', function () {
     src('$.')
     it('has 1 segments', function () { expect(db.segments.length).toBe(1); });
-    it('first is $f', function () { expect(seg2(db,0)).toEqual([mmom.Segment.BOGUS,'$.',null,null,null]); });
+    it('first is $f', function () { expect(seg2(db,0)).toEqual([MMOM.Segment.BOGUS,'$.',null,null,null]); });
     errs([ ['afile',0,'scanner','spurious-period'] ]);
 });
 
 describe('stray $. w/ label:', function () {
     src('foo $.')
     it('has 1 segments', function () { expect(db.segments.length).toBe(1); });
-    it('first is $f', function () { expect(seg2(db,0)).toEqual([mmom.Segment.BOGUS,'foo $.',null,null,'foo']); });
+    it('first is $f', function () { expect(seg2(db,0)).toEqual([MMOM.Segment.BOGUS,'foo $.',null,null,'foo']); });
     errs([ ['afile',4,'scanner','spurious-period'] ]);
 });
 

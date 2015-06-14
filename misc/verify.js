@@ -4,13 +4,13 @@ var write = function (str) { process.stdout.write(str.toString(), 'utf8'); };
 var readfile = function (file) { return require('fs').readFileSync(file, 'utf8'); };
 var filename = process.argv[2];
 
-var mmom = require('../src/MMOM.js');
+var MMOM = require('../src/MMOM.js');
 var Scoper = require('../src/Scoper.js');
 var Verify = require('../src/Verify.js');
 var ConsoleErrorFormatter = require('../src/ConsoleErrorFormatter.js');
 
 var time_1 = Date.now();
-var db = mmom.Scanner.parseSync( filename, function (s) { try { s.text = readfile(s.name); } catch(e) { s.text = ''; s.failed = e || 'false'; } });
+var db = MMOM.Scanner.parseSync( filename, function (s) { try { s.text = readfile(s.name); } catch(e) { s.text = ''; s.failed = e || 'false'; } });
 var time_2 = Date.now();
 write(`parse ${time_2 - time_1} ms\n`);
 write(ConsoleErrorFormatter(db.scanErrors));
@@ -23,7 +23,7 @@ time_1 = Date.now();
 var verifd = 0;
 Verify.install(db);
 db.segments.forEach(function (s,ix) {
-    if (s.type === mmom.Segment.PROVABLE) {
+    if (s.type === MMOM.Segment.PROVABLE) {
         verifd++;
         var err = Verify.install(db).verify(ix,false);
         if (err.length) write(`${s.label} ERR\n`);

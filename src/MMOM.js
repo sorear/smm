@@ -6,7 +6,7 @@ define([], function () {
 // This data model is fairly similar to that used by METAMATH.C, although we
 // make statement-level comments their own kind of segment.
 
-function MMSource(name, string) {
+function MMOMSource(name, string) {
     this.name = name;
     this.text = string;
     this.failed = false;
@@ -59,7 +59,7 @@ function getEolArray(string) {
     return out;
 }
 
-MMSource.prototype.lookupPos = function (pos) {
+MMOMSource.prototype.lookupPos = function (pos) {
     if (!this.eolMaps) this.eolMaps = getEolArray(this.text);
     var maps = this.eolMaps;
 
@@ -94,7 +94,7 @@ MMSource.prototype.lookupPos = function (pos) {
     return [ low+skip+1, pos-the_map[low]+1 ]; // "column" will be slightly off in the presence of tabs (evil) and supplementary characters (I care, but not much)
 };
 
-MMSource.prototype.getLine = function (lnum) {
+MMOMSource.prototype.getLine = function (lnum) {
     if (!this.eolMaps) this.eolMaps = getEolArray(this.text);
     var maps = this.eolMaps;
     lnum--;
@@ -112,16 +112,16 @@ MMSource.prototype.getLine = function (lnum) {
 
 var SP = []; while (SP.length < 33) SP.push(false); SP[32] = SP[9] = SP[13] = SP[12] = SP[10] = true;
 
-// keep this in sync with MMScanner.getToken
-MMSource.prototype.tokenEnd = function (pos) {
+// keep this in sync with MMOMScanner.getToken
+MMOMSource.prototype.tokenEnd = function (pos) {
     var ch;
     while (pos < this.text.length && ((ch = this.text.charCodeAt(pos)) > 32 || !SP[ch])) pos++;
     return pos;
 };
 
 // TODO: Add a length field and turn the zones into a linked list to support raw-text extraction without a reparse.  Will probably be needed for efficient comment rendering and WRITE SOURCE
-function MMSegment() {
-    this.type = MMSegment.EOF;
+function MMOMSegment() {
+    this.type = MMOMSegment.EOF;
     this._pos = null;
     this.label = null;
     this.math = null;
@@ -130,7 +130,7 @@ function MMSegment() {
     this.reparse_index = 0;
 }
 
-Object.defineProperty(MMSegment.prototype, 'raw', {
+Object.defineProperty(MMOMSegment.prototype, 'raw', {
     get: function () {
         var out = '', spans = this.spans;
         for (var i = 0; i < spans.length; i += 3) {
@@ -139,13 +139,13 @@ Object.defineProperty(MMSegment.prototype, 'raw', {
         return out;
     }
 });
-Object.defineProperty(MMSegment.prototype, 'mathPos', { get: function () { if (!this._pos) this._unlazy(); return this._pos.mathPos; } });
-Object.defineProperty(MMSegment.prototype, 'proofPos', { get: function () { if (!this._pos) this._unlazy(); return this._pos.proofPos; } });
-Object.defineProperty(MMSegment.prototype, 'startPos', { get: function () { if (!this._pos) this._unlazy(); return this._pos.startPos; } });
-Object.defineProperty(MMSegment.prototype, 'spans', { get: function () { if (!this._pos) this._unlazy(); return this._pos.spans; } });
+Object.defineProperty(MMOMSegment.prototype, 'mathPos', { get: function () { if (!this._pos) this._unlazy(); return this._pos.mathPos; } });
+Object.defineProperty(MMOMSegment.prototype, 'proofPos', { get: function () { if (!this._pos) this._unlazy(); return this._pos.proofPos; } });
+Object.defineProperty(MMOMSegment.prototype, 'startPos', { get: function () { if (!this._pos) this._unlazy(); return this._pos.startPos; } });
+Object.defineProperty(MMOMSegment.prototype, 'spans', { get: function () { if (!this._pos) this._unlazy(); return this._pos.spans; } });
 
-MMSegment.prototype._unlazy = function () {
-    var scanner = new MMScanner(this.reparse_zone);
+MMOMSegment.prototype._unlazy = function () {
+    var scanner = new MMOMScanner(this.reparse_zone);
     scanner.lazyPositions = false;
     scanner.reparsing = true;
     scanner.index = scanner.segment_start = this.reparse_index;
@@ -156,7 +156,7 @@ MMSegment.prototype._unlazy = function () {
     this._pos = nseg._pos;
 };
 
-function MMErrorLocation(kind, statement, source, from, to, data) {
+function MMOMErrorLocation(kind, statement, source, from, to, data) {
     this.kind = kind;
     this.statement = statement;
     this.source = source;
@@ -165,25 +165,25 @@ function MMErrorLocation(kind, statement, source, from, to, data) {
     this.data = data;
 }
 
-MMErrorLocation.scanToken = function (statement, source, pos) {
-    return new MMErrorLocation('scan-token', statement, source, pos, source.tokenEnd(pos), null);
+MMOMErrorLocation.scanToken = function (statement, source, pos) {
+    return new MMOMErrorLocation('scan-token', statement, source, pos, source.tokenEnd(pos), null);
 };
 
-MMErrorLocation._functional = function (statement, kind, ary, ix) {
-    return new MMErrorLocation(kind, statement, ary[ix], ary[ix+1], ary[ix].tokenEnd(ary[ix+1]), null);
+MMOMErrorLocation._functional = function (statement, kind, ary, ix) {
+    return new MMOMErrorLocation(kind, statement, ary[ix], ary[ix+1], ary[ix].tokenEnd(ary[ix+1]), null);
 };
 
-MMErrorLocation.statement = function (statement) { return MMErrorLocation._functional(statement, 'statement', statement.startPos, 0); }
-MMErrorLocation.label = function (statement) { return MMErrorLocation._functional(statement, 'label', statement.startPos, 0); }
-MMErrorLocation.math = function (statement, ix) { return MMErrorLocation._functional(statement, 'math', statement.mathPos, 2*ix); }
-MMErrorLocation.proof = function (statement, ix) { return MMErrorLocation._functional(statement, 'proof', statement.proofPos, 2*ix); }
+MMOMErrorLocation.statement = function (statement) { return MMOMErrorLocation._functional(statement, 'statement', statement.startPos, 0); }
+MMOMErrorLocation.label = function (statement) { return MMOMErrorLocation._functional(statement, 'label', statement.startPos, 0); }
+MMOMErrorLocation.math = function (statement, ix) { return MMOMErrorLocation._functional(statement, 'math', statement.mathPos, 2*ix); }
+MMOMErrorLocation.proof = function (statement, ix) { return MMOMErrorLocation._functional(statement, 'proof', statement.proofPos, 2*ix); }
 
-MMErrorLocation.prototype.error = function (category, code, data) {
-    return new MMError(this, category, code, data);
+MMOMErrorLocation.prototype.error = function (category, code, data) {
+    return new MMOMError(this, category, code, data);
 };
 
 // statement, span, category are required
-function MMError(location, category, code, data) {
+function MMOMError(location, category, code, data) {
     this.location = location;
     this.category = category;
     this.code = code;
@@ -191,66 +191,66 @@ function MMError(location, category, code, data) {
     if (!this.definition) throw new Error("No definition for generated error");
 }
 
-MMError.prototype.toString = function() {
+MMOMError.prototype.toString = function() {
     var source = this.location.source;
     var pos = source.lookupPos(this.location.from);
     return `${source.name}:${pos[0]}:${pos[1]}:  ${this.code}`; // TODO add human versions, test
 };
 
-MMError._registry = new Map();
+MMOMError._registry = new Map();
 
-Object.defineProperty(MMError.prototype, 'definition', { get: function () {
-    var l1 = MMError._registry.get(this.category);
+Object.defineProperty(MMOMError.prototype, 'definition', { get: function () {
+    var l1 = MMOMError._registry.get(this.category);
     return l1 && l1.get(this.code);
 } });
 
 // subst codes :l location :m math :s statement-label :t text/toString
-MMError.register = function (category, code, template, options) {
-    var l1 = MMError._registry.get(category);
-    if (!l1) MMError._registry.set(category, l1 = new Map);
+MMOMError.register = function (category, code, template, options) {
+    var l1 = MMOMError._registry.get(category);
+    if (!l1) MMOMError._registry.set(category, l1 = new Map);
     l1.set(code, { template: template, options: options });
 };
 
-MMError.register('scanner', 'bad-character', 'Characters in database may only be printable ASCII characters or the following controls: newline, carriage return, form feed, tab');
-MMError.register('scanner', 'failed-to-read', 'Failed to read, reason: «reason:t»');
-MMError.register('scanner', 'eof-in-comment', 'Comments must be closed in the file in which they start');
-MMError.register('scanner', 'pseudo-comment-end', '$) not legal in comment (add spaces if this is intended to end it)');
-MMError.register('scanner', 'pseudo-nested-comment', '$( not legal in comment');
-MMError.register('scanner', 'missing-filename', 'Filename missing in inclusion directive');
-MMError.register('scanner', 'unterminated-directive', 'Directives must be closed in the file in which they start');
-MMError.register('scanner', 'directive-too-long', 'Included file name must be a single token (spaces not allowed)');
-MMError.register('scanner', 'dollar-in-filename', '$ not allowed in included file name');
-MMError.register('scanner', 'invalid-label', 'Only alphanumerics, dashes, underscores, and periods are allowed in statement labels');
-MMError.register('scanner', 'duplicate-label', 'Label found but there is already a pending label');
-MMError.register('scanner', 'loose-comment-end', '$) found but there is no active comment');
-MMError.register('scanner', 'missing-proof', '$p statement must have a $= section with a proof');
-MMError.register('scanner', 'spurious-period', '$. found where not expected (no current statement)');
-MMError.register('scanner', 'spurious-proof', '$= proof sections are only allowed on $p statements');
-MMError.register('scanner', 'loose-directive-end', '$] found but there is no active file inclusion');
-MMError.register('scanner', 'nonterminated-math', 'Math string must be closed with $. or $= ... $. before beginning a new statement');
-MMError.register('scanner', 'nonterminated-proof', 'Proof string must be closed with $. before beginning a new statement');
-MMError.register('scanner', 'missing-label', 'This statement type requires a label');
-MMError.register('scanner', 'spurious-label', 'This statement type does not admit a label');
-MMError.register('scanner', 'pseudo-keyword', 'This token contains $ but is not a recognized keyword');
+MMOMError.register('scanner', 'bad-character', 'Characters in database may only be printable ASCII characters or the following controls: newline, carriage return, form feed, tab');
+MMOMError.register('scanner', 'failed-to-read', 'Failed to read, reason: «reason:t»');
+MMOMError.register('scanner', 'eof-in-comment', 'Comments must be closed in the file in which they start');
+MMOMError.register('scanner', 'pseudo-comment-end', '$) not legal in comment (add spaces if this is intended to end it)');
+MMOMError.register('scanner', 'pseudo-nested-comment', '$( not legal in comment');
+MMOMError.register('scanner', 'missing-filename', 'Filename missing in inclusion directive');
+MMOMError.register('scanner', 'unterminated-directive', 'Directives must be closed in the file in which they start');
+MMOMError.register('scanner', 'directive-too-long', 'Included file name must be a single token (spaces not allowed)');
+MMOMError.register('scanner', 'dollar-in-filename', '$ not allowed in included file name');
+MMOMError.register('scanner', 'invalid-label', 'Only alphanumerics, dashes, underscores, and periods are allowed in statement labels');
+MMOMError.register('scanner', 'duplicate-label', 'Label found but there is already a pending label');
+MMOMError.register('scanner', 'loose-comment-end', '$) found but there is no active comment');
+MMOMError.register('scanner', 'missing-proof', '$p statement must have a $= section with a proof');
+MMOMError.register('scanner', 'spurious-period', '$. found where not expected (no current statement)');
+MMOMError.register('scanner', 'spurious-proof', '$= proof sections are only allowed on $p statements');
+MMOMError.register('scanner', 'loose-directive-end', '$] found but there is no active file inclusion');
+MMOMError.register('scanner', 'nonterminated-math', 'Math string must be closed with $. or $= ... $. before beginning a new statement');
+MMOMError.register('scanner', 'nonterminated-proof', 'Proof string must be closed with $. before beginning a new statement');
+MMOMError.register('scanner', 'missing-label', 'This statement type requires a label');
+MMOMError.register('scanner', 'spurious-label', 'This statement type does not admit a label');
+MMOMError.register('scanner', 'pseudo-keyword', 'This token contains $ but is not a recognized keyword');
 
-MMSegment.EOF = 1;
-MMSegment.COMMENT = 2;
-MMSegment.OPEN = 3;
-MMSegment.CLOSE = 4;
-MMSegment.CONST = 5;
-MMSegment.VAR = 6;
-MMSegment.DV = 7;
-MMSegment.AXIOM = 8;
-MMSegment.PROVABLE = 9;
-MMSegment.BOGUS = 10;
-MMSegment.ESSEN = 11;
-MMSegment.FLOAT = 12;
-MMSegment.INCLUDE = 13;
+MMOMSegment.EOF = 1;
+MMOMSegment.COMMENT = 2;
+MMOMSegment.OPEN = 3;
+MMOMSegment.CLOSE = 4;
+MMOMSegment.CONST = 5;
+MMOMSegment.VAR = 6;
+MMOMSegment.DV = 7;
+MMOMSegment.AXIOM = 8;
+MMOMSegment.PROVABLE = 9;
+MMOMSegment.BOGUS = 10;
+MMOMSegment.ESSEN = 11;
+MMOMSegment.FLOAT = 12;
+MMOMSegment.INCLUDE = 13;
 
 var S_IDLE=1,S_LABEL=2,S_MATH=3,S_PROOF=4;
 
 // A scan context is a stateless object which survives the scan so as to support later lazy rescans.
-function MMScanContext(root, resolver, sync) {
+function MMOMScanContext(root, resolver, sync) {
     if (typeof resolver === 'string') {
         resolver = new Map([[ root, resolver ]]);
     }
@@ -270,10 +270,10 @@ function MMScanContext(root, resolver, sync) {
     this.sources = new Map();
 }
 
-MMScanContext.prototype.getSource = function (name) {
+MMOMScanContext.prototype.getSource = function (name) {
     var src = this.sources.get(name);
     if (!src) {
-        src = new MMSource(name, null);
+        src = new MMOMSource(name, null);
         this.resolver(src);
         if (this.sync && src.text === null) throw 'Resolver failed to synchronously return text in parseSync context';
         this.sources.set(name, src);
@@ -281,12 +281,12 @@ MMScanContext.prototype.getSource = function (name) {
     return src;
 };
 
-MMScanContext.prototype.initialZone = function (name) {
-    return new MMZone(this, this.getSource(name), null, 0, [name]);
+MMOMScanContext.prototype.initialZone = function (name) {
+    return new MMOMZone(this, this.getSource(name), null, 0, [name]);
 };
 
 // A zone stores the set of included files and the include stack.  A source position can always be identified by a zone and an offset.
-function MMZone(ctx, source, next, next_continue, included) {
+function MMOMZone(ctx, source, next, next_continue, included) {
     this.ctx = ctx;
     this.source = source;
     this.next = next;
@@ -294,9 +294,9 @@ function MMZone(ctx, source, next, next_continue, included) {
     this.included = included;
 }
 
-var BAILOUT_ZONE = new MMZone(new MMScanContext(), new MMSource(null, null), null, 0, []);
+var BAILOUT_ZONE = new MMOMZone(new MMOMScanContext(), new MMOMSource(null, null), null, 0, []);
 
-function MMScanner(zone) {
+function MMOMScanner(zone) {
     //Output
     this.segment_start = 0;
     this.segments = [];
@@ -311,7 +311,7 @@ function MMScanner(zone) {
     this.comment_state = false;
     this.directive_state = false;
     this.include_file = null;
-    this.segment = new MMSegment();
+    this.segment = new MMOMSegment();
     this.token_start = 0;
     this.token_special = false;
     this.segment.reparse_zone = zone;
@@ -327,11 +327,11 @@ function MMScanner(zone) {
     //if (!this.lazyPositions) this.segment._pos = { startPos: null, mathPos: [], proofPos: [], spans: [] };
 }
 
-MMScanner.prototype.addError = function (code, data) {
-    this.errors.push(MMErrorLocation.scanToken(this.segment, this.source, this.token_start).error('scanner', code, data));
+MMOMScanner.prototype.addError = function (code, data) {
+    this.errors.push(MMOMErrorLocation.scanToken(this.segment, this.source, this.token_start).error('scanner', code, data));
 };
 
-MMScanner.prototype.getToken = function () {
+MMOMScanner.prototype.getToken = function () {
     var ix = this.index, str = this.source.text;
     // source not yet loaded
     if (str === null) {
@@ -373,7 +373,7 @@ MMScanner.prototype.getToken = function () {
 };
 
 // You may only call this after comment_state and directive_state have both cleared.  also the current source must be loaded
-MMScanner.prototype.setPosition = function (zone, index) {
+MMOMScanner.prototype.setPosition = function (zone, index) {
     var segment_start = this.segment_start;
     if (this.segment._pos && this.index !== segment_start) {
         this.segment._pos.spans.push(this.source, segment_start, this.index);
@@ -389,11 +389,11 @@ MMScanner.prototype.setPosition = function (zone, index) {
 // We guarantee below that newSegment is only ever called with comment_state=false, directive_state=false (implying include_file is dead).
 // Most of the time, we call newSegment immediately before restarting the main loop with state=S_IDLE, so restarting from the current zone/index is correct (token_start is dead as it will be immediately clobbered by getToken, lt_* are not used in S_IDLE)
 // When a statement-starting keyword is seen with an active statement, we need to logically start a new statement *before* the just-read token so that the keyword will be correctly seen on reparse.
-MMScanner.prototype.newSegment = function (lt_index) {
+MMOMScanner.prototype.newSegment = function (lt_index) {
     if (this.segment._pos && lt_index !== this.segment_start) this.segment._pos.spans.push(this.source, this.segment_start, lt_index);
     this.segments.push(this.segment);
     this.segment_start = lt_index;
-    this.segment = new MMSegment();
+    this.segment = new MMOMSegment();
     this.segment.reparse_zone = this.zone;
     this.segment.reparse_index = lt_index;
     if (this.reparsing) {
@@ -405,19 +405,19 @@ MMScanner.prototype.newSegment = function (lt_index) {
 };
 
 var KW_DATA = {
-    '$a': { type: MMSegment.AXIOM,    label: true,  atomic: false },
-    '$p': { type: MMSegment.PROVABLE, label: true,  atomic: false },
-    '$c': { type: MMSegment.CONST,    label: false, atomic: false },
-    '$d': { type: MMSegment.DV,       label: false, atomic: false },
-    '$e': { type: MMSegment.ESSEN,    label: true,  atomic: false },
-    '$f': { type: MMSegment.FLOAT,    label: true,  atomic: false },
-    '$v': { type: MMSegment.VAR,      label: false, atomic: false },
-    '${': { type: MMSegment.OPEN,     label: false, atomic: true },
-    '$}': { type: MMSegment.CLOSE,    label: false, atomic: true },
-    '':   { type: MMSegment.EOF,      label: false, atomic: true },
+    '$a': { type: MMOMSegment.AXIOM,    label: true,  atomic: false },
+    '$p': { type: MMOMSegment.PROVABLE, label: true,  atomic: false },
+    '$c': { type: MMOMSegment.CONST,    label: false, atomic: false },
+    '$d': { type: MMOMSegment.DV,       label: false, atomic: false },
+    '$e': { type: MMOMSegment.ESSEN,    label: true,  atomic: false },
+    '$f': { type: MMOMSegment.FLOAT,    label: true,  atomic: false },
+    '$v': { type: MMOMSegment.VAR,      label: false, atomic: false },
+    '${': { type: MMOMSegment.OPEN,     label: false, atomic: true },
+    '$}': { type: MMOMSegment.CLOSE,    label: false, atomic: true },
+    '':   { type: MMOMSegment.EOF,      label: false, atomic: true },
 };
 
-MMScanner.prototype.scan = function () {
+MMOMScanner.prototype.scan = function () {
     var comment_state = this.comment_state;
     var directive_state = this.directive_state;
     var state = this.state;
@@ -446,7 +446,7 @@ MMScanner.prototype.scan = function () {
                     comment_state = false;
 
                     if (state === S_IDLE) {
-                        this.segment.type = MMSegment.COMMENT;
+                        this.segment.type = MMOMSegment.COMMENT;
                         this.newSegment(this.index);
                     }
 
@@ -480,10 +480,10 @@ MMScanner.prototype.scan = function () {
 
                 // TODO: this requires resolution to deal with path canonicity issues
                 if (this.zone.included.indexOf(this.include_file) < 0)
-                    this.setPosition( new MMZone( this.zone.ctx, this.zone.ctx.getSource(this.include_file), this.zone, this.index, this.zone.included.concat(this.include_file) ), 0 );
+                    this.setPosition( new MMOMZone( this.zone.ctx, this.zone.ctx.getSource(this.include_file), this.zone, this.index, this.zone.included.concat(this.include_file) ), 0 );
 
                 if (state === S_IDLE) {
-                    this.segment.type = MMSegment.INCLUDE;
+                    this.segment.type = MMOMSegment.INCLUDE;
                     this.newSegment(this.index);
                 }
 
@@ -552,14 +552,14 @@ MMScanner.prototype.scan = function () {
 
             case '$.':
                 if (state === S_MATH || state === S_PROOF) {
-                    if (this.segment.type === MMSegment.PROVABLE && state === S_MATH) {
+                    if (this.segment.type === MMOMSegment.PROVABLE && state === S_MATH) {
                         this.addError('missing-proof');
                     }
                     this.newSegment(this.index);
                 }
                 else {
                     this.addError('spurious-period'); // IDLE or LABEL
-                    this.segment.type = MMSegment.BOGUS;
+                    this.segment.type = MMOMSegment.BOGUS;
                     this.newSegment(this.index);
                 }
                 state = S_IDLE;
@@ -568,7 +568,7 @@ MMScanner.prototype.scan = function () {
             case '$=':
                 if (state !== S_MATH || !this.segment.proof) {
                     this.addError('spurious-proof');
-                    this.segment.type = MMSegment.BOGUS;
+                    this.segment.type = MMOMSegment.BOGUS;
                 }
                 else {
                     state = S_PROOF;
@@ -594,7 +594,7 @@ MMScanner.prototype.scan = function () {
 
                     // idle state cannot span a file boundary with spans (due to EOF having already been created), so it's unneccessary to check that
                     if (state === S_IDLE && this.index !== this.segment_start) {
-                        this.segment.type = MMSegment.EOF;
+                        this.segment.type = MMOMSegment.EOF;
                         this.setPosition(this.zone.next, this.zone.next_continue);
                         this.newSegment(this.index);
                     }
@@ -622,7 +622,7 @@ MMScanner.prototype.scan = function () {
                 if (kwdata.label) {
                     if (state !== S_LABEL) {
                         this.addError('missing-label');
-                        this.segment.type = MMSegment.BOGUS;
+                        this.segment.type = MMOMSegment.BOGUS;
                     }
                 }
                 else {
@@ -633,7 +633,7 @@ MMScanner.prototype.scan = function () {
 
                 if (kwdata.atomic) {
                     if (token === '') {
-                        this.db = new MMDatabase;
+                        this.db = new MMOMDatabase;
                         this.db.segments = this.segments;
                         this.db.scanErrors = this.errors;
                         if (this.index !== this.segment_start) this.newSegment(this.index);
@@ -662,24 +662,24 @@ MMScanner.prototype.scan = function () {
     }
 };
 
-function MMDatabase() {
+function MMOMDatabase() {
     this.segments = null;
     this.scanErrors = null;
     this.plugins = {};
 }
 
-MMScanner.parseSync = function (name, resolver) {
-    return new MMScanner(new MMScanContext(name, resolver, true).initialZone(name)).scan();
+MMOMScanner.parseSync = function (name, resolver) {
+    return new MMOMScanner(new MMOMScanContext(name, resolver, true).initialZone(name)).scan();
 };
 
 return {
-    Source: MMSource,
-    Error: MMError,
-    ErrorLocation: MMErrorLocation,
-    Segment: MMSegment,
-    Scanner: MMScanner,
-    Database: MMDatabase,
-    ScanContext: MMScanContext,
+    Source: MMOMSource,
+    Error: MMOMError,
+    ErrorLocation: MMOMErrorLocation,
+    Segment: MMOMSegment,
+    Scanner: MMOMScanner,
+    Database: MMOMDatabase,
+    ScanContext: MMOMScanContext,
 };
 
 });

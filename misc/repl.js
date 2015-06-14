@@ -5,7 +5,7 @@ var rl = require('readline').createInterface({
     output: process.stdout,
 });
 
-var mmom = require('../src/MMOM');
+var MMOM = require('../src/MMOM');
 var Scoper = require('../src/Scoper');
 var Verify = require('../src/Verify');
 
@@ -23,7 +23,7 @@ function read_db(fname, cb) {
         }
     }
     var done;
-    var scanner = new mmom.Scanner(new mmom.ScanContext(fname, function (src) {
+    var scanner = new MMOM.Scanner(new MMOM.ScanContext(fname, function (src) {
         require('fs').readFile(fname, 'utf8', function (err, text) {
             if (err) {
                 src.failed = true;
@@ -69,7 +69,7 @@ rl.on('line', function (l) {
         else if (+match[1] >= db.segments.length) {
             console.log('out of range');
         }
-        else if (db.segments[+match[1]].type !== mmom.Segment.PROVABLE) {
+        else if (db.segments[+match[1]].type !== MMOM.Segment.PROVABLE) {
             console.log('not a $p');
         }
         else {

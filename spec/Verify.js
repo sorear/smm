@@ -1,10 +1,10 @@
-var mmom = require('../src/MMOM.js');
+var MMOM = require('../src/MMOM.js');
 var Scoper = require('../src/Scoper.js');
 var Verify = require('../src/Verify.js');
 var db, vErr;
 function src(x) {
     beforeAll(function () {
-        db = mmom.Scanner.parseSync('afile',x);
+        db = MMOM.Scanner.parseSync('afile',x);
         if (db.scanErrors.length) throw new Error('unexpected scan errors');
         vErr = Verify.install(db).verify( Scoper.install(db).getSym('test').labelled );
     });
