@@ -49,6 +49,15 @@ describe('scan ${ token:', function () {
     errs([]);
 });
 
+describe('scan two tokens for linking:', function () {
+    src('${ ${')
+    it('has two statements', function () { expect(db.statements.length).toBe(2); });
+    it('first linked to database', function () { expect(db.statements[0].database).toBe(db); });
+    it('first linked to index', function () { expect(db.statements[0].index).toBe(0); });
+    it('second linked to database', function () { expect(db.statements[1].database).toBe(db); });
+    it('second linked to index', function () { expect(db.statements[1].index).toBe(1); });
+});
+
 describe('scan ${ token with leading whitespace:', function () {
     src('\n\n${')
     it('has one statement', function () { expect(db.statements.length).toBe(1); });

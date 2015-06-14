@@ -5,7 +5,8 @@
 SMM stores the state of a Metamath database as an instance of the `MMOM.Database` class.
 A database represents a sequence of zero or more individually well-formed statements of the Metamath language.
 A database can legally represent states which are *jointly* invalid, such as a database containing a proof but not some of the steps the proof depends on.
-Individual statements are represented by instances of `MMOM.Statement`; they are *immutable* and do not know their context.
+Individual statements are represented by instances of `MMOM.Statement`.
+A statement is born into a database, and thereafter is not (observably) modified except to remove it.
 Databases are modified by calling methods on the database to insert statements, remove statements, and replace statements with modified versions.
 
 Statements in SMM are the statements defined in the Metamath specification, plus SMM-specific statement types `COMMENT`, `INCLUDE`, `BOGUS`, and `EOF`;
@@ -82,3 +83,9 @@ Fake statements also have types, but their number and roles are not currently co
 Accessors for the fundamental parts of a statement.
 `math` and `proof` may be `null` on statement types for which they are not applicable;
 when they are applicable, they will always be present even if empty.
+
+    index = statement.index
+    database = statement.database
+    statement === database.statement(index)
+
+A statement which is in a database knows its database and index.

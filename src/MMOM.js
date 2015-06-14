@@ -128,7 +128,23 @@ function MMOMStatement() {
     this.proof = null;
     this.reparse_zone = null;
     this.reparse_index = 0;
+    this.length = 0;
+    this.index = 0;
 }
+
+MMOMStatement.EOF = 1;
+MMOMStatement.COMMENT = 2;
+MMOMStatement.OPEN = 3;
+MMOMStatement.CLOSE = 4;
+MMOMStatement.CONSTANT = 5;
+MMOMStatement.VARIABLE = 6;
+MMOMStatement.DISJOINT = 7;
+MMOMStatement.AXIOM = 8;
+MMOMStatement.PROVABLE = 9;
+MMOMStatement.BOGUS = 10;
+MMOMStatement.ESSENTIAL = 11;
+MMOMStatement.FLOATING = 12;
+MMOMStatement.INCLUDE = 13;
 
 Object.defineProperty(MMOMStatement.prototype, 'raw', {
     get: function () {
@@ -143,6 +159,10 @@ Object.defineProperty(MMOMStatement.prototype, 'mathPos', { get: function () { i
 Object.defineProperty(MMOMStatement.prototype, 'proofPos', { get: function () { if (!this._pos) this._unlazy(); return this._pos.proofPos; } });
 Object.defineProperty(MMOMStatement.prototype, 'startPos', { get: function () { if (!this._pos) this._unlazy(); return this._pos.startPos; } });
 Object.defineProperty(MMOMStatement.prototype, 'spans', { get: function () { if (!this._pos) this._unlazy(); return this._pos.spans; } });
+
+Object.defineProperty(MMOMStatement.prototype, 'database', { get: function () {
+    return this.index >= 0 ? this.reparse_zone.database : null;
+} });
 
 MMOMStatement.prototype._unlazy = function () {
     var scanner = new MMOMScanner(this.reparse_zone);
@@ -233,20 +253,6 @@ MMOMError.register('scanner', 'missing-label', 'This statement type requires a l
 MMOMError.register('scanner', 'spurious-label', 'This statement type does not admit a label');
 MMOMError.register('scanner', 'pseudo-keyword', 'This token contains $ but is not a recognized keyword');
 
-MMOMStatement.EOF = 1;
-MMOMStatement.COMMENT = 2;
-MMOMStatement.OPEN = 3;
-MMOMStatement.CLOSE = 4;
-MMOMStatement.CONSTANT = 5;
-MMOMStatement.VARIABLE = 6;
-MMOMStatement.DISJOINT = 7;
-MMOMStatement.AXIOM = 8;
-MMOMStatement.PROVABLE = 9;
-MMOMStatement.BOGUS = 10;
-MMOMStatement.ESSENTIAL = 11;
-MMOMStatement.FLOATING = 12;
-MMOMStatement.INCLUDE = 13;
-
 var S_IDLE=1,S_LABEL=2,S_MATH=3,S_PROOF=4;
 
 // A scan context is a stateless object which survives the scan so as to support later lazy rescans.
@@ -268,11 +274,12 @@ MMOMScanContext.prototype.getSource = function (name) {
 };
 
 MMOMScanContext.prototype.initialZone = function (name) {
-    return new MMOMZone(this, this.getSource(name), null, 0, [name]);
+    return new MMOMZone(new MMOMDatabase(), this, this.getSource(name), null, 0, [name]);
 };
 
 // A zone stores the set of included files and the include stack.  A source position can always be identified by a zone and an offset.
-function MMOMZone(ctx, source, next, next_continue, included) {
+function MMOMZone(db, ctx, source, next, next_continue, included) {
+    this.database = db;
     this.ctx = ctx;
     this.source = source;
     this.next = next;
@@ -280,13 +287,13 @@ function MMOMZone(ctx, source, next, next_continue, included) {
     this.included = included;
 }
 
-var BAILOUT_ZONE = new MMOMZone(new MMOMScanContext(), new MMOMSource(null, null), null, 0, []);
+var BAILOUT_ZONE = new MMOMZone(null, new MMOMScanContext(), new MMOMSource(null, null), null, 0, []);
 
 function MMOMScanner(zone) {
     //Output
     this.statement_start = 0;
     this.statements = [];
-    this.db = null;
+    this.db = zone.database;
     this.errors = [];
     this.typesetting_comment = null;
 
@@ -361,8 +368,9 @@ MMOMScanner.prototype.getToken = function () {
 // You may only call this after comment_state and directive_state have both cleared.  also the current source must be loaded
 MMOMScanner.prototype.setPosition = function (zone, index) {
     var statement_start = this.statement_start;
-    if (this.statement._pos && this.index !== statement_start) {
-        this.statement._pos.spans.push(this.source, statement_start, this.index);
+    if (this.index !== statement_start) {
+        if (this.statement._pos) this.statement._pos.spans.push(this.source, statement_start, this.index);
+        this.statement.length += (this.index - statement_start);
     }
 
     this.zone = zone;
@@ -376,7 +384,11 @@ MMOMScanner.prototype.setPosition = function (zone, index) {
 // Most of the time, we call newSegment immediately before restarting the main loop with state=S_IDLE, so restarting from the current zone/index is correct (token_start is dead as it will be immediately clobbered by getToken, lt_* are not used in S_IDLE)
 // When a statement-starting keyword is seen with an active statement, we need to logically start a new statement *before* the just-read token so that the keyword will be correctly seen on reparse.
 MMOMScanner.prototype.newSegment = function (lt_index) {
-    if (this.statement._pos && lt_index !== this.statement_start) this.statement._pos.spans.push(this.source, this.statement_start, lt_index);
+    if (lt_index !== this.statement_start) {
+        if (this.statement._pos) this.statement._pos.spans.push(this.source, this.statement_start, lt_index);
+        this.statement.length += (lt_index - this.statement_start);
+    }
+    this.statement.index = this.statements.length;
     this.statements.push(this.statement);
     this.statement_start = lt_index;
     this.statement = new MMOMStatement();
@@ -466,7 +478,7 @@ MMOMScanner.prototype.scan = function () {
 
                 // TODO: this requires resolution to deal with path canonicity issues
                 if (this.zone.included.indexOf(this.include_file) < 0)
-                    this.setPosition( new MMOMZone( this.zone.ctx, this.zone.ctx.getSource(this.include_file), this.zone, this.index, this.zone.included.concat(this.include_file) ), 0 );
+                    this.setPosition( new MMOMZone( this.zone.database, this.zone.ctx, this.zone.ctx.getSource(this.include_file), this.zone, this.index, this.zone.included.concat(this.include_file) ), 0 );
 
                 if (state === S_IDLE) {
                     this.statement.type = MMOMStatement.INCLUDE;
@@ -619,9 +631,10 @@ MMOMScanner.prototype.scan = function () {
 
                 if (kwdata.atomic) {
                     if (token === '') {
-                        this.db = new MMOMDatabase;
-                        this.db.statements = this.statements;
-                        this.db.scanErrors = this.errors;
+                        if (!this.reparsing) {
+                            this.db.statements = this.statements;
+                            this.db.scanErrors = this.errors;
+                        }
                         if (this.index !== this.statement_start) this.newSegment(this.index);
                         if (this.reparsing)
                             return this.statements[0];
