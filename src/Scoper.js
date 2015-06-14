@@ -5,6 +5,8 @@ if (typeof define !== 'function') { var define = require('amdefine')(module) }
 define(['./MMOM'], function (mmom) {
 'use strict';
 
+var EL = mmom.ErrorLocation;
+
 function MMScoper(db) {
     this.db = db;
     this.ends_ary = null;
@@ -41,8 +43,8 @@ MMScoper.prototype.getPos = function (pos,ix) {
     return pos.slice(2*ix,2*ix+2);
 };
 
-MMScoper.prototype.addError = function (pos,ix,code,data) {
-    this.errors.push(new mmom.Error(pos[2*ix], pos[2*ix+1], 'scope', code, data));
+MMScoper.prototype.addError = function (loc,code,data) {
+    this.errors.push(loc.error('scope', code, data));
 };
 
 // note, even with invalid input we do not allow the symbol table to contain overlapping active ranges for $v/$f.  so it is only necessary to check the last math entry
@@ -51,6 +53,8 @@ MMScoper.prototype.getSym = function (label) {
     return symtab.get(label) || (symtab.set(label, r = { labelled: -1, math: [], mathix: [], float: [], checkGen: -1 }), r);
 };
 
+function ELsym(statements, sym, ix) { return EL.math(statements[sym.math[ix]], sym.mathix[ix]); }
+
 MMScoper.prototype.labelCheck = function (segix) {
     // error if label already used
     // error if label exists as a math symbol
@@ -58,12 +62,12 @@ MMScoper.prototype.labelCheck = function (segix) {
     var segtab = this.db.segments;
     var sym = this.getSym(segtab[segix].label);
     if (sym.labelled >= 0) {
-        this.addError(segtab[segix].startPos, 0, 'label-used-twice', { prev: this.getPos(segtab[sym.labelled].startPos, 0) });
+        this.addError(EL.label(segtab[segix]), 'label-used-twice', { prev: EL.label(segtab[sym.labelled]) });
         return;
     }
 
     if (sym.math.length) {
-        this.addError(segtab[segix].startPos, 0, 'math-then-label', { prev: this.getPos(segtab[sym.math[0]].mathPos, sym.mathix[0]) });
+        this.addError(EL.label(segtab[segix]), 'math-then-label', { prev: ELsym(segtab,sym,0) });
     }
 
     sym.labelled = segix;
@@ -81,7 +85,7 @@ MMScoper.prototype.mathCheck = function (segix) {
     var i, sym;
 
     if (seg.math.length === 0) {
-        this.addError(seg.startPos, 0, 'eap-empty');
+        this.addError(EL.statement(seg), 'eap-empty');
         return;
     }
 
@@ -91,18 +95,18 @@ MMScoper.prototype.mathCheck = function (segix) {
         sym.checkGen = segix;
 
         if (!sym.math.length || ends_ary[sym.math[sym.math.length - 1]] !== HIGHSEG) {
-            this.addError(seg.mathPos, i, 'eap-not-active-sym');
+            this.addError(EL.math(seg, i), 'eap-not-active-sym');
             continue;
         }
 
         if (segtab[sym.math[sym.math.length - 1]].type === VAR) {
             if (i === 0) {
-                this.addError(seg.mathPos, 0, 'eap-first-not-const');
+                this.addError(EL.math(seg, i), 'eap-first-not-const');
                 // can only get away with this impurity because it's first
             }
 
             if (!sym.float.length || ends_ary[sym.float[sym.float.length - 1]] !== HIGHSEG) {
-                this.addError(seg.mathPos, i, 'eap-no-active-float');
+                this.addError(EL.math(seg, i), 'eap-no-active-float');
             }
         }
     }
@@ -145,25 +149,25 @@ MMScoper.prototype.scan = function () {
                     open_stack.pop();
                 }
                 else {
-                    this.addError(seg.startPos, 0, 'close-stack-empty');
+                    this.addError(EL.statement(seg), 'close-stack-empty');
                 }
                 break;
 
             case CONST:
                 if (seg.math.length === 0)
-                    this.addError(seg.startPos, 0, 'const-empty');
+                    this.addError(EL.statement(seg), 'const-empty');
                 if (scope_ed_stack.length)
-                    this.addError(seg.startPos, 0, 'const-not-top-scope');
+                    this.addError(EL.statement(seg), 'const-not-top-scope');
                 ends_ary[segix] = HIGHSEG;
                 // error if not top scope
                 for (i = 0; i < seg.math.length; i++) {
                     sym = this.getSym(seg.math[i]);
                     if (sym.labelled >= 0) {
-                        this.addError(seg.mathPos, i, 'label-then-const', { prev: this.getPos(segments[sym.labelled].startPos, 0) });
+                        this.addError(EL.math(seg, i), 'label-then-const', { prev: EL.label(segments[sym.labelled]) });
                     }
 
                     if (sym.math.length) {
-                        this.addError(seg.mathPos, i, 'math-then-const', { prev: this.getPos(segments[sym.math[0]].mathPos, sym.mathix[0]) });
+                        this.addError(EL.math(seg, i), 'math-then-const', { prev: ELsym(segments, sym, 0) });
                         // error if already used, and DON'T add to symbol table
                     }
                     else {
@@ -176,17 +180,17 @@ MMScoper.prototype.scan = function () {
 
             case VAR:
                 if (seg.math.length === 0)
-                    this.addError(seg.startPos, 0, 'var-empty');
+                    this.addError(EL.statement(seg), 'var-empty');
                 ends_ary[segix] = HIGHSEG;
                 for (i = 0; i < seg.math.length; i++) {
                     sym = this.getSym(seg.math[i]);
                     if (sym.labelled >= 0) {
-                        this.addError(seg.mathPos, i, 'label-then-var', { prev: this.getPos(segments[sym.labelled].startPos, 0) });
+                        this.addError(EL.math(seg, i), 'label-then-var', { prev: EL.label(segments[sym.labelled]) });
                     }
 
                     if (sym.math.length && ends_ary[sym.math[sym.math.length - 1]] === HIGHSEG) {
                         // still active
-                        this.addError(seg.mathPos, i, 'math-then-var', { prev: this.getPos(segments[sym.math[sym.math.length - 1]].mathPos, sym.mathix[sym.math.length - 1]) });
+                        this.addError(EL.math(seg, i), 'math-then-var', { prev: ELsym(segments, sym, sym.math.length - 1) });
                     }
                     else {
                         this.varSyms.add(seg.math[i]);
@@ -212,21 +216,21 @@ MMScoper.prototype.scan = function () {
                 open_vf_stack.push(segix);
                 ends_ary[segix] = HIGHSEG;
                 if (seg.math.length !== 2) {
-                    this.addError(seg.startPos, 0, 'float-format');
+                    this.addError(EL.statement(seg), 'float-format');
                     break;
                 }
                 sym = this.getSym(seg.math[0]);
                 if (!sym.math.length || ends_ary[sym.math[sym.math.length - 1]] !== HIGHSEG || segments[sym.math[sym.math.length - 1]].type !== CONST) {
-                    this.addError(seg.mathPos, 0, 'float-not-active-const');
+                    this.addError(EL.math(seg, 0), 'float-not-active-const');
                     break;
                 }
                 sym = this.getSym(seg.math[1]);
                 if (!sym.math.length || ends_ary[sym.math[sym.math.length - 1]] !== HIGHSEG || segments[sym.math[sym.math.length - 1]].type !== VAR) {
-                    this.addError(seg.mathPos, 1, 'float-not-active-var');
+                    this.addError(EL.math(seg, 1), 'float-not-active-var');
                     break;
                 }
                 if (sym.float.length && ends_ary[sym.float[sym.float.length - 1]] === HIGHSEG) {
-                    this.addError(seg.mathPos, 1, 'float-active-float', { prev: this.getPos(segments[sym.float[sym.float.length - 1]].startPos, 0) });
+                    this.addError(EL.math(seg, 1), 'float-active-float', { prev: EL.statement(segments[sym.float[sym.float.length - 1]]) });
                     break;
                 }
                 sym.float.push(segix);
@@ -234,13 +238,13 @@ MMScoper.prototype.scan = function () {
 
             case DV:
                 if (seg.math.length < 2) {
-                    this.addError(seg.startPos, 0, 'dv-short');
+                    this.addError(EL.statement(seg), 'dv-short');
                     break;
                 }
                 used = new Map();
                 for (var i = 0; i < seg.math.length; i++) {
                     if (used.has(seg.math[i])) {
-                        this.addError(seg.mathPos, i, 'dv-repeated', { prev: this.getPos(seg.mathPos, used.get(seg.math[i])) });
+                        this.addError(EL.math(seg, i), 'dv-repeated', { prev: EL.math(seg, used.get(seg.math[i])) });
                         continue;
                     }
                     used.set(seg.math[i],i);
@@ -249,7 +253,7 @@ MMScoper.prototype.scan = function () {
                         // active $v
                     }
                     else {
-                        this.addError(seg.mathPos, i, 'dv-not-active-var');
+                        this.addError(EL.math(seg, i), 'dv-not-active-var');
                     }
                 }
                 // add to e/d chain
@@ -268,7 +272,7 @@ MMScoper.prototype.scan = function () {
 
     // error if scope stack not empty
     for (i = 0; i < open_stack.length; i++) {
-        this.addError(open_stack[i].startPos, 0, 'never-closed');
+        this.addError(EL.statement(open_stack[i]), 'never-closed');
     }
 };
 
@@ -326,7 +330,7 @@ function MMFrame(scoper, ix) {
 
     // errors should only happen here if there were errors during scan(), but you went to verify a proof anyway
     if (!seg.math.length)
-        this.errors.push(new mmom.Error(seg.startPos[0], seg.startPos[1], 'frame-builder', 'empty-math'));
+        this.errors.push(EL.statement(seg).error('frame-builder', 'empty-math'));
 
     for (k = 1; k < seg.math.length; k++) {
         tok = seg.math[k];
@@ -349,7 +353,7 @@ function MMFrame(scoper, ix) {
         if (segments[j].type === ESSEN) {
             essen_ix.push(j);
             if (!segments[j].math.length) {
-                this.errors.push(new mmom.Error(seg.startPos[0], seg.startPos[1], 'frame-builder', 'empty-hyp'));
+                this.errors.push(EL.statement(seg).error('frame-builder', 'empty-hyp'));
                 continue;
             }
             // capture mandatory variables
@@ -372,7 +376,7 @@ function MMFrame(scoper, ix) {
         sym = scoper.getSym(tok);
 
         if (!sym || !sym.float.length) {
-            this.errors.push(new mmom.Error(seg.startPos[0], seg.startPos[1], 'frame-builder', 'no-float'));
+            this.errors.push(EL.statement(seg).error('frame-builder', 'no-float'));
             continue;
         }
 
@@ -390,7 +394,7 @@ function MMFrame(scoper, ix) {
         j = sym.float[j];
 
         if (segments[j].type !== FLOAT || j >= ix || ix >= scoper.ends_ary[j]) {
-            this.errors.push(new mmom.Error(seg.startPos[0], seg.startPos[1], 'frame-builder', 'inactive-float'));
+            this.errors.push(EL.statement(seg).error('frame-builder', 'inactive-float'));
             continue;
         }
         if (!segments[j].math.length) {

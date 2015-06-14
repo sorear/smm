@@ -14,7 +14,7 @@ function deep(x) { console.log(require('util').inspect(x,{depth:null,colors:true
 function err(i) {
     var e = vErr[i];
     if (!e) return [];
-    var o = [ e.source.name, e.offset, e.category, e.code ];
+    var o = [ e.location.source.name, e.location.from, e.category, e.code ];
     if (e.data && e.data.prev) o.push(e.data.prev[0].name, e.data.prev[1]);
     return o;
 }

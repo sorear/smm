@@ -13,8 +13,8 @@ function deep(x) { console.log(require('util').inspect(x,{depth:null,colors:true
 function err(db,i) {
     var e = db.plugins.scoper.errors[i];
     if (!e) return [];
-    var o = [ e.source.name, e.offset, e.category, e.code ];
-    if (e.data && e.data.prev) o.push(e.data.prev[0].name, e.data.prev[1]);
+    var o = [ e.location.source.name, e.location.from, e.category, e.code ];
+    if (e.data && e.data.prev) o.push(e.data.prev.source.name, e.data.prev.from);
     return o;
 }
 

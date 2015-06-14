@@ -27,8 +27,8 @@ MMVerifyStandard.install = function (db) {
 
 // TODO: use "data" more systematically so that e.g. the math strings are displayed on unification and dv failure
 MMVerifyStandard.prototype.proofError = function (seg, i, code, data) {
-    if (i < 0) return new mmom.Error(seg.startPos[0], seg.startPos[1], 'verify', code, data);
-    return new mmom.Error(seg.proofPos[2*i+0], seg.proofPos[2*i+1], 'verify', code, data);
+    if (i < 0) return mmom.ErrorLocation.statement(seg).error('verify', code, data);
+    return mmom.ErrorLocation.proof(seg,i).error('verify', code, data);
 };
 
 function __array(set) { var a=[]; set.forEach(function(v) { a.push(v); }); return a; } // Array.of

@@ -94,6 +94,15 @@ MMSource.prototype.lookupPos = function (pos) {
     return [ low+skip+1, pos-the_map[low]+1 ]; // "column" will be slightly off in the presence of tabs (evil) and supplementary characters (I care, but not much)
 };
 
+var SP = []; while (SP.length < 33) SP.push(false); SP[32] = SP[9] = SP[13] = SP[12] = SP[10] = true;
+
+// keep this in sync with MMScanner.getToken
+MMSource.prototype.tokenEnd = function (pos) {
+    var ch;
+    while (pos < this.text.length && ((ch = this.text.charCodeAt(pos)) > 32 || !SP[ch])) pos++;
+    return pos;
+};
+
 // TODO: Add a length field and turn the zones into a linked list to support raw-text extraction without a reparse.  Will probably be needed for efficient comment rendering and WRITE SOURCE
 function MMSegment() {
     this.type = MMSegment.EOF;
@@ -131,18 +140,44 @@ MMSegment.prototype._unlazy = function () {
     this._pos = nseg._pos;
 };
 
-// TODO change this to a span list, provide span list extractors for tokens, segments, compressed integers
-function MMError(source, offset, category, code, data) {
+function MMErrorLocation(kind, statement, source, from, to, data) {
+    this.kind = kind;
+    this.statement = statement;
     this.source = source;
-    this.offset = offset;
-    this.category = category;
-    this.code = code;
+    this.from = from;
+    this.to = to;
     this.data = data;
 }
 
+MMErrorLocation.scanToken = function (statement, source, pos) {
+    return new MMErrorLocation('scan-token', statement, source, pos, source.tokenEnd(pos), null);
+};
+
+MMErrorLocation._functional = function (statement, kind, ary, ix) {
+    return new MMErrorLocation(kind, statement, ary[ix], ary[ix+1], ary[ix].tokenEnd(ary[ix+1]), null);
+};
+
+MMErrorLocation.statement = function (statement) { return MMErrorLocation._functional(statement, 'statement', statement.startPos, 0); }
+MMErrorLocation.label = function (statement) { return MMErrorLocation._functional(statement, 'label', statement.startPos, 0); }
+MMErrorLocation.math = function (statement, ix) { return MMErrorLocation._functional(statement, 'math', statement.mathPos, 2*ix); }
+MMErrorLocation.proof = function (statement, ix) { return MMErrorLocation._functional(statement, 'proof', statement.proofPos, 2*ix); }
+
+MMErrorLocation.prototype.error = function (category, code, data) {
+    return new MMError(this, category, code, data);
+};
+
+// statement, span, category are required
+function MMError(location, category, code, data) {
+    this.location = location;
+    this.category = category;
+    this.code = code;
+    this.data = data || {};
+}
+
 MMError.prototype.toString = function() {
-    var pos = this.source.lookupPos(this.offset);
-    return `${this.source.name}:${pos[0]}:${pos[1]}:  ${this.code}`; // TODO add human versions, test
+    var source = this.location.source;
+    var pos = source.lookupPos(this.location.from);
+    return `${source.name}:${pos[0]}:${pos[1]}:  ${this.code}`; // TODO add human versions, test
 };
 
 MMSegment.EOF = 1;
@@ -239,8 +274,6 @@ function MMScanner(zone) {
     //if (!this.lazyPositions) this.segment._pos = { startPos: null, mathPos: [], proofPos: [], spans: [] };
 }
 
-var SP = []; while (SP.length < 33) SP.push(false); SP[32] = SP[9] = SP[13] = SP[12] = SP[10] = true;
-
 MMScanner.prototype.getToken = function () {
     var ix = this.index, str = this.source.text;
     // source not yet loaded
@@ -296,7 +329,7 @@ MMScanner.prototype.setPosition = function (zone, index) {
 };
 
 MMScanner.prototype.addError = function (code) {
-    this.errors.push(new MMError(this.source, this.token_start, 'scanner', code));
+    this.errors.push(MMErrorLocation.scanToken(this.segment, this.source, this.token_start).error('scanner', code));
 };
 
 // We need to be able to reconstruct a segment by restarting parsing with the specified zone and index and a clean segment.  This is trivial for the first segment but for others the loss of parser state is an issue
@@ -589,6 +622,7 @@ MMScanner.parseSync = function (name, resolver) {
 return {
     Source: MMSource,
     Error: MMError,
+    ErrorLocation: MMErrorLocation,
     Segment: MMSegment,
     Scanner: MMScanner,
     Database: MMDatabase,
