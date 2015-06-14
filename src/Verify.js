@@ -3,6 +3,25 @@ if (typeof define !== 'function') { var define = require('amdefine')(module) }
 define(['./MMOM','./ABRStringStore','./Scoper'], function (mmom,ABRStringStore,Scoper) {
 'use strict';
 
+mmom.Error.register('verify', 'no-such-assertion', 'Cannot find referenced assertion or hypothesis');
+mmom.Error.register('verify', 'inactive-hyp', 'Hypothesis referenced in proof must be active for the proof');
+mmom.Error.register('verify', 'not-yet-proved', 'Assertion referenced in proof must be textually before the proof');
+mmom.Error.register('verify', 'recall-out-of-range', 'Compressed proof is trying to recall a step which has not yet been saved'); //MOREDATA
+mmom.Error.register('verify', 'stack-underflow', 'This step has more mandatory hypotheses than the current stack depth'); //MOREDATA
+mmom.Error.register('verify', 'type-mismatch', 'Mandatory hypothesis type differs from type on stack'); //MOREDATA
+mmom.Error.register('verify', 'math-mismatch', 'Stacked proof must equal math string for mandatory $e hypothesis'); //MOREDATA
+mmom.Error.register('verify', 'dv-violation', 'Disjoint variable condition is not satisfied'); //MOREDATA
+mmom.Error.register('verify', 'compression-nonterm', ') token missing in compressed proof');
+mmom.Error.register('verify', 'compression-dummy-in-roster', '? may not be used in compressed proof header');
+mmom.Error.register('verify', 'compression-redundant-roster', 'Compressed proof header may not repeat statements or statements that are already mandatory hypotheses');
+mmom.Error.register('verify', 'compressed-cant-save-here', 'In compressed proof, Z may only appear immediately after a compressed step'); //MOREDATA
+mmom.Error.register('verify', 'bad-compressed-char', 'In compressed proof, only ? and capital letters are permitted'); //MOREDATA
+mmom.Error.register('verify', 'compressed-partial-integer', 'Compressed proof ends with partial step');
+mmom.Error.register('verify', 'done-bad-stack-depth', 'Proof must end with exactly one value on stack'); //MOREDATA
+mmom.Error.register('verify', 'done-bad-type', 'Type of final result of proof must be same as assertion'); //MOREDATA
+mmom.Error.register('verify', 'done-bad-math', 'Math string of final result of proof must be same as assertion'); //MOREDATA
+mmom.Error.register('verify', 'done-incomplete', 'Proof contains ? placeholder', { warning: true });
+
 var hists={};
 function sample(name,val) {
     if (!hists[name]) {
@@ -67,6 +86,19 @@ function MMVerifyState(verify, segix, use_abr) {
     Object.seal(this);
 }
 
+function mungeErrors(pos, list) {
+    return list.map(function (e) { return pos.error(e.category, e.code, e.data); });
+}
+
+MMVerifyState.prototype.stepPos = function (step) {
+    if (this.seg.proof[0] === '(') {
+        return mmom.ErrorLocation.statement(this.seg); // pointing at individual steps of a compressed proof is not all that useful
+    }
+    else {
+        return mmom.ErrorLocation.proof(this.seg, i);
+    }
+};
+
 MMVerifyState.prototype.check = function (i, label) {
     var sym, oframe = this.aframes.get(label), i, v;
 
@@ -83,7 +115,7 @@ MMVerifyState.prototype.check = function (i, label) {
     }
 
     if (oframe.errors.length) {
-        this.errors = oframe.errors;
+        this.errors = mungeErrors(this.stepPos(i), oframe.errors);
         return null;
     }
 
@@ -123,7 +155,7 @@ MMVerifyState.prototype.save = function () {
 
 MMVerifyState.prototype.recall = function (i) {
     if (i >= this.mathSave.length)
-        return this.errors = [this.proofError(this.seg,-1,'recall-out-of-range')];
+        return this.errors = [this.proofError(-1,'recall-out-of-range')];
     //console.log(`before recall ${i}:`,typeStack.slice(0,depth).map(function (t,ix) { return `[${t}@${__array(varStack[ix]).join('+')}@ ${abr.toArray(mathStack[ix],null,20).join(' ')}]`; }).join(' '));
     this.mathStack[this.depth] = this.mathSave[i];
     this.varStack[this.depth] = this.varSave[i];
@@ -300,7 +332,7 @@ MMVerifyState.prototype.checkProof = function () {
     if (this.seg.type !== mmom.Segment.PROVABLE) throw new Error('verify called on not-$p');
 
     var frame = this.frame;
-    if (frame.errors.length) return frame.errors;
+    if (frame.errors.length) return mungeErrors(mmom.ErrorLocation.statement(this.seg), frame.errors);
     //sample('hyp',frame.mand.length);
 
     // the proof syntax is not self-synchronizing, so for the most part it doesn't make sense to continue

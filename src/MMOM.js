@@ -172,6 +172,7 @@ function MMError(location, category, code, data) {
     this.category = category;
     this.code = code;
     this.data = data || {};
+    if (!this.definition) throw new Error("No definition for generated error");
 }
 
 MMError.prototype.toString = function() {
@@ -179,6 +180,42 @@ MMError.prototype.toString = function() {
     var pos = source.lookupPos(this.location.from);
     return `${source.name}:${pos[0]}:${pos[1]}:  ${this.code}`; // TODO add human versions, test
 };
+
+MMError._registry = new Map();
+
+Object.defineProperty(MMError.prototype, 'definition', { get: function () {
+    var l1 = MMError._registry.get(this.category);
+    return l1 && l1.get(this.code);
+} });
+
+// subst codes :l location :m math :s statement-label :t text/toString
+MMError.register = function (category, code, template, options) {
+    var l1 = MMError._registry.get(category);
+    if (!l1) MMError._registry.set(category, l1 = new Map);
+    l1.set(code, { template: template, options: options });
+};
+
+MMError.register('scanner', 'bad-character', 'Characters in database may only be printable ASCII characters or the following controls: newline, carriage return, form feed, tab');
+MMError.register('scanner', 'failed-to-read', 'Failed to read, reason: «reason:t»');
+MMError.register('scanner', 'eof-in-comment', 'Comments must be closed in the file in which they start');
+MMError.register('scanner', 'pseudo-comment-end', '$) not legal in comment (add spaces if this is intended to end it)');
+MMError.register('scanner', 'pseudo-nested-comment', '$( not legal in comment');
+MMError.register('scanner', 'missing-filename', 'Filename missing in inclusion directive');
+MMError.register('scanner', 'unterminated-directive', 'Directives must be closed in the file in which they start');
+MMError.register('scanner', 'directive-too-long', 'Included file name must be a single token (spaces not allowed)');
+MMError.register('scanner', 'dollar-in-filename', '$ not allowed in included file name');
+MMError.register('scanner', 'invalid-label', 'Only alphanumerics, dashes, underscores, and periods are allowed in statement labels');
+MMError.register('scanner', 'duplicate-label', 'Label found but there is already a pending label');
+MMError.register('scanner', 'loose-comment-end', '$) found but there is no active comment');
+MMError.register('scanner', 'missing-proof', '$p statement must have a $= section with a proof');
+MMError.register('scanner', 'spurious-period', '$. found where not expected (no current statement)');
+MMError.register('scanner', 'spurious-proof', '$= proof sections are only allowed on $p statements');
+MMError.register('scanner', 'loose-directive-end', '$] found but there is no active file inclusion');
+MMError.register('scanner', 'nonterminated-math', 'Math string must be closed with $. or $= ... $. before beginning a new statement');
+MMError.register('scanner', 'nonterminated-proof', 'Proof string must be closed with $. before beginning a new statement');
+MMError.register('scanner', 'missing-label', 'This statement type requires a label');
+MMError.register('scanner', 'spurious-label', 'This statement type does not admit a label');
+MMError.register('scanner', 'pseudo-keyword', 'This token contains $ but is not a recognized keyword');
 
 MMSegment.EOF = 1;
 MMSegment.COMMENT = 2;
@@ -274,6 +311,10 @@ function MMScanner(zone) {
     //if (!this.lazyPositions) this.segment._pos = { startPos: null, mathPos: [], proofPos: [], spans: [] };
 }
 
+MMScanner.prototype.addError = function (code, data) {
+    this.errors.push(MMErrorLocation.scanToken(this.segment, this.source, this.token_start).error('scanner', code, data));
+};
+
 MMScanner.prototype.getToken = function () {
     var ix = this.index, str = this.source.text;
     // source not yet loaded
@@ -307,7 +348,7 @@ MMScanner.prototype.getToken = function () {
     if (start === ix) {
         // getToken should return '' exactly once before the zone is switched out, hence falls through below
         if (this.source.failed)
-            this.addError('failed-to-read');
+            this.addError('failed-to-read', { reason: this.source.failed });
         this.token_special = true;
         return '';
     }
@@ -326,10 +367,6 @@ MMScanner.prototype.setPosition = function (zone, index) {
     this.source = zone.source;
     this.index = index;
     this.segment_start = index;
-};
-
-MMScanner.prototype.addError = function (code) {
-    this.errors.push(MMErrorLocation.scanToken(this.segment, this.source, this.token_start).error('scanner', code));
 };
 
 // We need to be able to reconstruct a segment by restarting parsing with the specified zone and index and a clean segment.  This is trivial for the first segment but for others the loss of parser state is an issue
