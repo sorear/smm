@@ -66,10 +66,10 @@ rl.on('line', function (l) {
         if (!db) {
             console.log('no database');
         }
-        else if (+match[1] >= db.segments.length) {
+        else if (+match[1] >= db.statements.length) {
             console.log('out of range');
         }
-        else if (db.segments[+match[1]].type !== MMOM.Segment.PROVABLE) {
+        else if (db.statements[+match[1]].type !== MMOM.Statement.PROVABLE) {
             console.log('not a $p');
         }
         else {

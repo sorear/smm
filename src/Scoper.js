@@ -58,15 +58,15 @@ MMOM.Error.register('frame-builder', 'inactive-float', 'Frame building failed: h
 // $f: active range
 // $d: $d chain
 
-var PROVABLE = MMOM.Segment.PROVABLE;
-var AXIOM = MMOM.Segment.AXIOM;
-var OPEN = MMOM.Segment.OPEN;
-var CLOSE = MMOM.Segment.CLOSE;
-var VAR = MMOM.Segment.VAR;
-var CONST = MMOM.Segment.CONST;
-var ESSEN = MMOM.Segment.ESSEN;
-var FLOAT = MMOM.Segment.FLOAT;
-var DV = MMOM.Segment.DV;
+var PROVABLE = MMOM.Statement.PROVABLE;
+var AXIOM = MMOM.Statement.AXIOM;
+var OPEN = MMOM.Statement.OPEN;
+var CLOSE = MMOM.Statement.CLOSE;
+var VAR = MMOM.Statement.VAR;
+var CONST = MMOM.Statement.CONST;
+var ESSEN = MMOM.Statement.ESSEN;
+var FLOAT = MMOM.Statement.FLOAT;
+var DV = MMOM.Statement.DV;
 
 MMScoper.prototype.getPos = function (pos,ix) {
     return pos.slice(2*ix,2*ix+2);
@@ -88,7 +88,7 @@ MMScoper.prototype.labelCheck = function (segix) {
     // error if label already used
     // error if label exists as a math symbol
     // record label
-    var segtab = this.db.segments;
+    var segtab = this.db.statements;
     var sym = this.getSym(segtab[segix].label);
     if (sym.labelled >= 0) {
         this.addError(EL.label(segtab[segix]), 'label-used-twice', { prev: EL.label(segtab[sym.labelled]) });
@@ -108,7 +108,7 @@ var HIGHSEG = MMScoper.HIGHSEG = -1 >>> 1;
 MMScoper.prototype.mathCheck = function (segix) {
     // EAP math string check (all tokens active, first constant, active $f for each variable)
 
-    var segtab = this.db.segments;
+    var segtab = this.db.statements;
     var seg = segtab[segix];
     var ends_ary = this.ends_ary;
     var i, sym;
@@ -142,22 +142,22 @@ MMScoper.prototype.mathCheck = function (segix) {
 };
 
 MMScoper.prototype.scan = function () {
-    var segix, segments = this.db.segments, seg;
+    var segix, statements = this.db.statements, seg;
     var open_vf_stack = []; // includes a -1 sentinel for each open scope
     var open_ed_ptr = -1;
     var scope_ed_stack = [];
     var open_stack = [];
     var i, j;
     this.errors = [];
-    var ends_ary = this.ends_ary = new Int32Array(segments.length); // efcv (always HIGHSEG for c)
-    var chains_ary = this.chains_ary = new Int32Array(segments.length); // edap
+    var ends_ary = this.ends_ary = new Int32Array(statements.length); // efcv (always HIGHSEG for c)
+    var chains_ary = this.chains_ary = new Int32Array(statements.length); // edap
     this.symtab = new Map();
     this.varSyms = new Set();
     var used;
     var sym;
 
-    for (segix = 0; segix < segments.length; segix++) {
-        seg = segments[segix];
+    for (segix = 0; segix < statements.length; segix++) {
+        seg = statements[segix];
 
         switch (seg.type) {
             case OPEN:
@@ -192,11 +192,11 @@ MMScoper.prototype.scan = function () {
                 for (i = 0; i < seg.math.length; i++) {
                     sym = this.getSym(seg.math[i]);
                     if (sym.labelled >= 0) {
-                        this.addError(EL.math(seg, i), 'label-then-const', { prev: EL.label(segments[sym.labelled]) });
+                        this.addError(EL.math(seg, i), 'label-then-const', { prev: EL.label(statements[sym.labelled]) });
                     }
 
                     if (sym.math.length) {
-                        this.addError(EL.math(seg, i), 'math-then-const', { prev: ELsym(segments, sym, 0) });
+                        this.addError(EL.math(seg, i), 'math-then-const', { prev: ELsym(statements, sym, 0) });
                         // error if already used, and DON'T add to symbol table
                     }
                     else {
@@ -214,12 +214,12 @@ MMScoper.prototype.scan = function () {
                 for (i = 0; i < seg.math.length; i++) {
                     sym = this.getSym(seg.math[i]);
                     if (sym.labelled >= 0) {
-                        this.addError(EL.math(seg, i), 'label-then-var', { prev: EL.label(segments[sym.labelled]) });
+                        this.addError(EL.math(seg, i), 'label-then-var', { prev: EL.label(statements[sym.labelled]) });
                     }
 
                     if (sym.math.length && ends_ary[sym.math[sym.math.length - 1]] === HIGHSEG) {
                         // still active
-                        this.addError(EL.math(seg, i), 'math-then-var', { prev: ELsym(segments, sym, sym.math.length - 1) });
+                        this.addError(EL.math(seg, i), 'math-then-var', { prev: ELsym(statements, sym, sym.math.length - 1) });
                     }
                     else {
                         this.varSyms.add(seg.math[i]);
@@ -249,17 +249,17 @@ MMScoper.prototype.scan = function () {
                     break;
                 }
                 sym = this.getSym(seg.math[0]);
-                if (!sym.math.length || ends_ary[sym.math[sym.math.length - 1]] !== HIGHSEG || segments[sym.math[sym.math.length - 1]].type !== CONST) {
+                if (!sym.math.length || ends_ary[sym.math[sym.math.length - 1]] !== HIGHSEG || statements[sym.math[sym.math.length - 1]].type !== CONST) {
                     this.addError(EL.math(seg, 0), 'float-not-active-const');
                     break;
                 }
                 sym = this.getSym(seg.math[1]);
-                if (!sym.math.length || ends_ary[sym.math[sym.math.length - 1]] !== HIGHSEG || segments[sym.math[sym.math.length - 1]].type !== VAR) {
+                if (!sym.math.length || ends_ary[sym.math[sym.math.length - 1]] !== HIGHSEG || statements[sym.math[sym.math.length - 1]].type !== VAR) {
                     this.addError(EL.math(seg, 1), 'float-not-active-var');
                     break;
                 }
                 if (sym.float.length && ends_ary[sym.float[sym.float.length - 1]] === HIGHSEG) {
-                    this.addError(EL.math(seg, 1), 'float-active-float', { prev: EL.statement(segments[sym.float[sym.float.length - 1]]) });
+                    this.addError(EL.math(seg, 1), 'float-active-float', { prev: EL.statement(statements[sym.float[sym.float.length - 1]]) });
                     break;
                 }
                 sym.float.push(segix);
@@ -278,7 +278,7 @@ MMScoper.prototype.scan = function () {
                     }
                     used.set(seg.math[i],i);
                     sym = this.getSym(seg.math[i]);
-                    if (sym.math.length && segments[sym.math[sym.math.length - 1]].type === VAR && ends_ary[sym.math[sym.math.length - 1]] === HIGHSEG) {
+                    if (sym.math.length && statements[sym.math[sym.math.length - 1]].type === VAR && ends_ary[sym.math[sym.math.length - 1]] === HIGHSEG) {
                         // active $v
                     }
                     else {
@@ -338,8 +338,8 @@ function cook_substify_vars(mandVarsMap, math) {
 var EMPTY_MAP = new Map();
 
 function MMFrame(scoper, ix) {
-    var segments = scoper.db.segments;
-    var seg = segments[ix];
+    var statements = scoper.db.statements;
+    var seg = statements[ix];
     var math;
     var essen_ix = [];
     var dv_ix = [];
@@ -379,21 +379,21 @@ function MMFrame(scoper, ix) {
     if (!this.hasFrame) return;
 
     for (j = scoper.chains_ary[ix]; j >= 0; j = scoper.chains_ary[j]) {
-        if (segments[j].type === ESSEN) {
+        if (statements[j].type === ESSEN) {
             essen_ix.push(j);
-            if (!segments[j].math.length) {
-                this.errors.push(EL.statement(seg).error('frame-builder', 'empty-hyp', { hyp: EL.statement(segments[j]), ref: EL.statement(seg) }));
+            if (!statements[j].math.length) {
+                this.errors.push(EL.statement(seg).error('frame-builder', 'empty-hyp', { hyp: EL.statement(statements[j]), ref: EL.statement(seg) }));
                 continue;
             }
             // capture mandatory variables
-            for (k = 1; k < segments[j].math.length; k++) {
-                tok = segments[j].math[k];
+            for (k = 1; k < statements[j].math.length; k++) {
+                tok = statements[j].math[k];
                 if (scoper.varSyms.has(tok) && !mandVarsMap.has(tok)) {
                     mandVarsMap.set(tok, this.mandVars.length);
                     this.mandVars.push(tok);
                 }
             }
-            this.mand.push({ float: false, type: segments[j].math[0], ix: 0, goal: segments[j].math.slice(1), goal_s: cook_substify(mandVarsMap, segments[j].math), stmt: j });
+            this.mand.push({ float: false, type: statements[j].math[0], ix: 0, goal: statements[j].math.slice(1), goal_s: cook_substify(mandVarsMap, statements[j].math), stmt: j });
         }
         else {
             dv_ix.push(j);
@@ -422,21 +422,21 @@ function MMFrame(scoper, ix) {
 
         j = sym.float[j];
 
-        if (segments[j].type !== FLOAT || j >= ix || ix >= scoper.ends_ary[j]) {
+        if (statements[j].type !== FLOAT || j >= ix || ix >= scoper.ends_ary[j]) {
             this.errors.push(EL.statement(seg).error('frame-builder', 'inactive-float', { 'var': tok, ref: EL.statement(seg) }));
             continue;
         }
-        if (!segments[j].math.length) {
+        if (!statements[j].math.length) {
             throw "can't happen";
         }
 
-        this.mand.push({ float: true, type: segments[j].math[0], ix: i, goal: null, goal_s: null, stmt: j });
+        this.mand.push({ float: true, type: statements[j].math[0], ix: i, goal: null, goal_s: null, stmt: j });
     }
 
     this.mand.sort(function (a,b) { return a.stmt - b.stmt; });
 
     for (j = 0; j < dv_ix.length; j++) {
-        math = segments[dv_ix[j]].math;
+        math = statements[dv_ix[j]].math;
 
         for (k = 0; k < math.length; k++) {
             if (!this.dv.has(math[k])) this.dv.set(math[k], new Set());

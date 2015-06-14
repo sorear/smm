@@ -4,7 +4,7 @@ define([], function () {
 'use strict';
 
 // This data model is fairly similar to that used by METAMATH.C, although we
-// make statement-level comments their own kind of segment.
+// make statement-level comments their own kind of statement.
 
 function MMOMSource(name, string) {
     this.name = name;
@@ -120,8 +120,8 @@ MMOMSource.prototype.tokenEnd = function (pos) {
 };
 
 // TODO: Add a length field and turn the zones into a linked list to support raw-text extraction without a reparse.  Will probably be needed for efficient comment rendering and WRITE SOURCE
-function MMOMSegment() {
-    this.type = MMOMSegment.EOF;
+function MMOMStatement() {
+    this.type = MMOMStatement.EOF;
     this._pos = null;
     this.label = null;
     this.math = null;
@@ -130,7 +130,7 @@ function MMOMSegment() {
     this.reparse_index = 0;
 }
 
-Object.defineProperty(MMOMSegment.prototype, 'raw', {
+Object.defineProperty(MMOMStatement.prototype, 'raw', {
     get: function () {
         var out = '', spans = this.spans;
         for (var i = 0; i < spans.length; i += 3) {
@@ -139,21 +139,21 @@ Object.defineProperty(MMOMSegment.prototype, 'raw', {
         return out;
     }
 });
-Object.defineProperty(MMOMSegment.prototype, 'mathPos', { get: function () { if (!this._pos) this._unlazy(); return this._pos.mathPos; } });
-Object.defineProperty(MMOMSegment.prototype, 'proofPos', { get: function () { if (!this._pos) this._unlazy(); return this._pos.proofPos; } });
-Object.defineProperty(MMOMSegment.prototype, 'startPos', { get: function () { if (!this._pos) this._unlazy(); return this._pos.startPos; } });
-Object.defineProperty(MMOMSegment.prototype, 'spans', { get: function () { if (!this._pos) this._unlazy(); return this._pos.spans; } });
+Object.defineProperty(MMOMStatement.prototype, 'mathPos', { get: function () { if (!this._pos) this._unlazy(); return this._pos.mathPos; } });
+Object.defineProperty(MMOMStatement.prototype, 'proofPos', { get: function () { if (!this._pos) this._unlazy(); return this._pos.proofPos; } });
+Object.defineProperty(MMOMStatement.prototype, 'startPos', { get: function () { if (!this._pos) this._unlazy(); return this._pos.startPos; } });
+Object.defineProperty(MMOMStatement.prototype, 'spans', { get: function () { if (!this._pos) this._unlazy(); return this._pos.spans; } });
 
-MMOMSegment.prototype._unlazy = function () {
+MMOMStatement.prototype._unlazy = function () {
     var scanner = new MMOMScanner(this.reparse_zone);
     scanner.lazyPositions = false;
     scanner.reparsing = true;
-    scanner.index = scanner.segment_start = this.reparse_index;
-    scanner.segment._pos = { startPos: null, mathPos: null, proofPos: null, spans: [] };
+    scanner.index = scanner.statement_start = this.reparse_index;
+    scanner.statement._pos = { startPos: null, mathPos: null, proofPos: null, spans: [] };
 
-    var nseg = scanner.scan();
-    if (!nseg) throw "can't happen - sources unavailable in reparse";
-    this._pos = nseg._pos;
+    var nst = scanner.scan();
+    if (!nst) throw "can't happen - sources unavailable in reparse";
+    this._pos = nst._pos;
 };
 
 function MMOMErrorLocation(kind, statement, source, from, to, data) {
@@ -233,19 +233,19 @@ MMOMError.register('scanner', 'missing-label', 'This statement type requires a l
 MMOMError.register('scanner', 'spurious-label', 'This statement type does not admit a label');
 MMOMError.register('scanner', 'pseudo-keyword', 'This token contains $ but is not a recognized keyword');
 
-MMOMSegment.EOF = 1;
-MMOMSegment.COMMENT = 2;
-MMOMSegment.OPEN = 3;
-MMOMSegment.CLOSE = 4;
-MMOMSegment.CONST = 5;
-MMOMSegment.VAR = 6;
-MMOMSegment.DV = 7;
-MMOMSegment.AXIOM = 8;
-MMOMSegment.PROVABLE = 9;
-MMOMSegment.BOGUS = 10;
-MMOMSegment.ESSEN = 11;
-MMOMSegment.FLOAT = 12;
-MMOMSegment.INCLUDE = 13;
+MMOMStatement.EOF = 1;
+MMOMStatement.COMMENT = 2;
+MMOMStatement.OPEN = 3;
+MMOMStatement.CLOSE = 4;
+MMOMStatement.CONST = 5;
+MMOMStatement.VAR = 6;
+MMOMStatement.DV = 7;
+MMOMStatement.AXIOM = 8;
+MMOMStatement.PROVABLE = 9;
+MMOMStatement.BOGUS = 10;
+MMOMStatement.ESSEN = 11;
+MMOMStatement.FLOAT = 12;
+MMOMStatement.INCLUDE = 13;
 
 var S_IDLE=1,S_LABEL=2,S_MATH=3,S_PROOF=4;
 
@@ -298,24 +298,24 @@ var BAILOUT_ZONE = new MMOMZone(new MMOMScanContext(), new MMOMSource(null, null
 
 function MMOMScanner(zone) {
     //Output
-    this.segment_start = 0;
-    this.segments = [];
+    this.statement_start = 0;
+    this.statements = [];
     this.db = null;
     this.errors = [];
     this.typesetting_comment = null;
 
     //State machine
     //Define a quiescent state as where IDLE, !comment, !directive, at the top of the loop in scan()
-    //Then include_file/token_start/lt_index/lt_zone are dead, segment can be considered fresh
+    //Then include_file/token_start/lt_index/lt_zone are dead, statement can be considered fresh
     this.state = S_IDLE;
     this.comment_state = false;
     this.directive_state = false;
     this.include_file = null;
-    this.segment = new MMOMSegment();
+    this.statement = new MMOMStatement();
     this.token_start = 0;
     this.token_special = false;
-    this.segment.reparse_zone = zone;
-    this.segment.reparse_index = 0;
+    this.statement.reparse_zone = zone;
+    this.statement.reparse_index = 0;
 
     //Input
     this.zone = zone;
@@ -324,11 +324,11 @@ function MMOMScanner(zone) {
 
     this.reparsing = false;
     this.lazyPositions = true;
-    //if (!this.lazyPositions) this.segment._pos = { startPos: null, mathPos: [], proofPos: [], spans: [] };
+    //if (!this.lazyPositions) this.statement._pos = { startPos: null, mathPos: [], proofPos: [], spans: [] };
 }
 
 MMOMScanner.prototype.addError = function (code, data) {
-    this.errors.push(MMOMErrorLocation.scanToken(this.segment, this.source, this.token_start).error('scanner', code, data));
+    this.errors.push(MMOMErrorLocation.scanToken(this.statement, this.source, this.token_start).error('scanner', code, data));
 };
 
 MMOMScanner.prototype.getToken = function () {
@@ -374,47 +374,47 @@ MMOMScanner.prototype.getToken = function () {
 
 // You may only call this after comment_state and directive_state have both cleared.  also the current source must be loaded
 MMOMScanner.prototype.setPosition = function (zone, index) {
-    var segment_start = this.segment_start;
-    if (this.segment._pos && this.index !== segment_start) {
-        this.segment._pos.spans.push(this.source, segment_start, this.index);
+    var statement_start = this.statement_start;
+    if (this.statement._pos && this.index !== statement_start) {
+        this.statement._pos.spans.push(this.source, statement_start, this.index);
     }
 
     this.zone = zone;
     this.source = zone.source;
     this.index = index;
-    this.segment_start = index;
+    this.statement_start = index;
 };
 
-// We need to be able to reconstruct a segment by restarting parsing with the specified zone and index and a clean segment.  This is trivial for the first segment but for others the loss of parser state is an issue
+// We need to be able to reconstruct a statement by restarting parsing with the specified zone and index and a clean statement.  This is trivial for the first statement but for others the loss of parser state is an issue
 // We guarantee below that newSegment is only ever called with comment_state=false, directive_state=false (implying include_file is dead).
 // Most of the time, we call newSegment immediately before restarting the main loop with state=S_IDLE, so restarting from the current zone/index is correct (token_start is dead as it will be immediately clobbered by getToken, lt_* are not used in S_IDLE)
 // When a statement-starting keyword is seen with an active statement, we need to logically start a new statement *before* the just-read token so that the keyword will be correctly seen on reparse.
 MMOMScanner.prototype.newSegment = function (lt_index) {
-    if (this.segment._pos && lt_index !== this.segment_start) this.segment._pos.spans.push(this.source, this.segment_start, lt_index);
-    this.segments.push(this.segment);
-    this.segment_start = lt_index;
-    this.segment = new MMOMSegment();
-    this.segment.reparse_zone = this.zone;
-    this.segment.reparse_index = lt_index;
+    if (this.statement._pos && lt_index !== this.statement_start) this.statement._pos.spans.push(this.source, this.statement_start, lt_index);
+    this.statements.push(this.statement);
+    this.statement_start = lt_index;
+    this.statement = new MMOMStatement();
+    this.statement.reparse_zone = this.zone;
+    this.statement.reparse_index = lt_index;
     if (this.reparsing) {
         this.zone = BAILOUT_ZONE;
         this.source = this.zone.source;
     }
-    if (!this.lazyPositions) this.segment._pos = { startPos: null, mathPos: null, proofPos: null, spans: [] };
-    return this.segment;
+    if (!this.lazyPositions) this.statement._pos = { startPos: null, mathPos: null, proofPos: null, spans: [] };
+    return this.statement;
 };
 
 var KW_DATA = {
-    '$a': { type: MMOMSegment.AXIOM,    label: true,  atomic: false },
-    '$p': { type: MMOMSegment.PROVABLE, label: true,  atomic: false },
-    '$c': { type: MMOMSegment.CONST,    label: false, atomic: false },
-    '$d': { type: MMOMSegment.DV,       label: false, atomic: false },
-    '$e': { type: MMOMSegment.ESSEN,    label: true,  atomic: false },
-    '$f': { type: MMOMSegment.FLOAT,    label: true,  atomic: false },
-    '$v': { type: MMOMSegment.VAR,      label: false, atomic: false },
-    '${': { type: MMOMSegment.OPEN,     label: false, atomic: true },
-    '$}': { type: MMOMSegment.CLOSE,    label: false, atomic: true },
-    '':   { type: MMOMSegment.EOF,      label: false, atomic: true },
+    '$a': { type: MMOMStatement.AXIOM,    label: true,  atomic: false },
+    '$p': { type: MMOMStatement.PROVABLE, label: true,  atomic: false },
+    '$c': { type: MMOMStatement.CONST,    label: false, atomic: false },
+    '$d': { type: MMOMStatement.DV,       label: false, atomic: false },
+    '$e': { type: MMOMStatement.ESSEN,    label: true,  atomic: false },
+    '$f': { type: MMOMStatement.FLOAT,    label: true,  atomic: false },
+    '$v': { type: MMOMStatement.VAR,      label: false, atomic: false },
+    '${': { type: MMOMStatement.OPEN,     label: false, atomic: true },
+    '$}': { type: MMOMStatement.CLOSE,    label: false, atomic: true },
+    '':   { type: MMOMStatement.EOF,      label: false, atomic: true },
 };
 
 MMOMScanner.prototype.scan = function () {
@@ -431,7 +431,7 @@ MMOMScanner.prototype.scan = function () {
 
         if (token === null) {
             if (this.zone === BAILOUT_ZONE && this.reparsing) {
-                return this.segments[0];
+                return this.statements[0];
             }
             this.comment_state = comment_state;
             this.state = state;
@@ -446,14 +446,14 @@ MMOMScanner.prototype.scan = function () {
                     comment_state = false;
 
                     if (state === S_IDLE) {
-                        this.segment.type = MMOMSegment.COMMENT;
+                        this.statement.type = MMOMStatement.COMMENT;
                         this.newSegment(this.index);
                     }
 
                     continue;
 
                 case '$t':
-                    this.typesetting_comment = this.segment; // since we can very efficiently find this here
+                    this.typesetting_comment = this.statement; // since we can very efficiently find this here
                     continue;
 
                 case '':
@@ -483,7 +483,7 @@ MMOMScanner.prototype.scan = function () {
                     this.setPosition( new MMOMZone( this.zone.ctx, this.zone.ctx.getSource(this.include_file), this.zone, this.index, this.zone.included.concat(this.include_file) ), 0 );
 
                 if (state === S_IDLE) {
-                    this.segment.type = MMOMSegment.INCLUDE;
+                    this.statement.type = MMOMStatement.INCLUDE;
                     this.newSegment(this.index);
                 }
 
@@ -516,21 +516,21 @@ MMOMScanner.prototype.scan = function () {
                 case S_IDLE:
                     if (/[^-_.0-9a-zA-Z]/.test(token))
                         this.addError('invalid-label'); // currently still allow into DOM
-                    this.segment.label = token;
-                    if (posit) this.segment._pos.startPos = [this.source, this.token_start];
+                    this.statement.label = token;
+                    if (posit) this.statement._pos.startPos = [this.source, this.token_start];
                     state = S_LABEL;
                     break;
                 case S_LABEL:
                     this.addError('duplicate-label');
-                    this.segment.label = token;
+                    this.statement.label = token;
                     break;
                 case S_MATH:
-                    this.segment.math.push(token);
-                    if (posit) this.segment._pos.mathPos.push(this.source, this.token_start);
+                    this.statement.math.push(token);
+                    if (posit) this.statement._pos.mathPos.push(this.source, this.token_start);
                     break;
                 case S_PROOF:
-                    this.segment.proof.push(token);
-                    if (posit) this.segment._pos.proofPos.push(this.source, this.token_start);
+                    this.statement.proof.push(token);
+                    if (posit) this.statement._pos.proofPos.push(this.source, this.token_start);
                     break;
             }
             continue;
@@ -552,23 +552,23 @@ MMOMScanner.prototype.scan = function () {
 
             case '$.':
                 if (state === S_MATH || state === S_PROOF) {
-                    if (this.segment.type === MMOMSegment.PROVABLE && state === S_MATH) {
+                    if (this.statement.type === MMOMStatement.PROVABLE && state === S_MATH) {
                         this.addError('missing-proof');
                     }
                     this.newSegment(this.index);
                 }
                 else {
                     this.addError('spurious-period'); // IDLE or LABEL
-                    this.segment.type = MMOMSegment.BOGUS;
+                    this.statement.type = MMOMStatement.BOGUS;
                     this.newSegment(this.index);
                 }
                 state = S_IDLE;
                 break;
 
             case '$=':
-                if (state !== S_MATH || !this.segment.proof) {
+                if (state !== S_MATH || !this.statement.proof) {
                     this.addError('spurious-proof');
-                    this.segment.type = MMOMSegment.BOGUS;
+                    this.statement.type = MMOMStatement.BOGUS;
                 }
                 else {
                     state = S_PROOF;
@@ -593,8 +593,8 @@ MMOMScanner.prototype.scan = function () {
                     // file switch: need not interrupt a statement
 
                     // idle state cannot span a file boundary with spans (due to EOF having already been created), so it's unneccessary to check that
-                    if (state === S_IDLE && this.index !== this.segment_start) {
-                        this.segment.type = MMOMSegment.EOF;
+                    if (state === S_IDLE && this.index !== this.statement_start) {
+                        this.statement.type = MMOMStatement.EOF;
                         this.setPosition(this.zone.next, this.zone.next_continue);
                         this.newSegment(this.index);
                     }
@@ -604,7 +604,7 @@ MMOMScanner.prototype.scan = function () {
                     break;
                 }
 
-                // less than ideal because the keyword gets boxed into the last segment.  should ideally back up the previous by a statement or two
+                // less than ideal because the keyword gets boxed into the last statement.  should ideally back up the previous by a statement or two
                 if (state === S_MATH) {
                     this.addError('nonterminated-math');
                     this.newSegment(lt_index);
@@ -617,28 +617,28 @@ MMOMScanner.prototype.scan = function () {
                 }
 
                 kwdata = KW_DATA[token];
-                this.segment.type = kwdata.type
+                this.statement.type = kwdata.type
 
                 if (kwdata.label) {
                     if (state !== S_LABEL) {
                         this.addError('missing-label');
-                        this.segment.type = MMOMSegment.BOGUS;
+                        this.statement.type = MMOMStatement.BOGUS;
                     }
                 }
                 else {
                     if (state === S_LABEL) this.addError('spurious-label');
-                    this.segment.label = null;
-                    if (posit) this.segment._pos.startPos = [this.source, this.token_start];
+                    this.statement.label = null;
+                    if (posit) this.statement._pos.startPos = [this.source, this.token_start];
                 }
 
                 if (kwdata.atomic) {
                     if (token === '') {
                         this.db = new MMOMDatabase;
-                        this.db.segments = this.segments;
+                        this.db.statements = this.statements;
                         this.db.scanErrors = this.errors;
-                        if (this.index !== this.segment_start) this.newSegment(this.index);
+                        if (this.index !== this.statement_start) this.newSegment(this.index);
                         if (this.reparsing)
-                            return this.segments[0];
+                            return this.statements[0];
                         return this.db;
                     }
                     this.newSegment(this.index);
@@ -646,11 +646,11 @@ MMOMScanner.prototype.scan = function () {
                 }
                 else {
                     state = S_MATH;
-                    this.segment.math = [];
-                    if (posit) this.segment._pos.mathPos = [];
-                    if (token === '$p') { // allocate a proof segment even if the segment type was forced to BOGUS due to missing label
-                        if (posit) this.segment._pos.proofPos = [];
-                        this.segment.proof = [];
+                    this.statement.math = [];
+                    if (posit) this.statement._pos.mathPos = [];
+                    if (token === '$p') { // allocate a proof statement even if the statement type was forced to BOGUS due to missing label
+                        if (posit) this.statement._pos.proofPos = [];
+                        this.statement.proof = [];
                     }
                 }
                 break;
@@ -663,7 +663,7 @@ MMOMScanner.prototype.scan = function () {
 };
 
 function MMOMDatabase() {
-    this.segments = null;
+    this.statements = null;
     this.scanErrors = null;
     this.plugins = {};
 }
@@ -676,7 +676,7 @@ return {
     Source: MMOMSource,
     Error: MMOMError,
     ErrorLocation: MMOMErrorLocation,
-    Segment: MMOMSegment,
+    Statement: MMOMStatement,
     Scanner: MMOMScanner,
     Database: MMOMDatabase,
     ScanContext: MMOMScanContext,

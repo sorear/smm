@@ -55,8 +55,8 @@ function __array(set) { var a=[]; set.forEach(function(v) { a.push(v); }); retur
 function MMVerifyState(verify, segix, use_abr) {
     this.scoper = verify.scoper;
     this.verify = verify;
-    this.segments = verify.db.segments;
-    this.seg = this.segments[segix];
+    this.statements = verify.db.statements;
+    this.seg = this.statements[segix];
     this.var2flag = new Map();
     this.use_bitfield_dv = true;
     this.flag2var = [];
@@ -79,7 +79,7 @@ function MMVerifyState(verify, segix, use_abr) {
 
     if (!this.frame) {
         this.frame = this.scoper.getFrame(segix); 
-        this.aframes.set(verify.db.segments[segix].label, this.frame);
+        this.aframes.set(verify.db.statements[segix].label, this.frame);
         this.aframes.set(segix, this.frame);
     }
 
@@ -329,7 +329,7 @@ MMVerifyState.prototype.proofError = function (i, code) {
 
 MMVerifyState.prototype.checkProof = function () {
     var proof = this.seg.proof;
-    if (this.seg.type !== MMOM.Segment.PROVABLE) throw new Error('verify called on not-$p');
+    if (this.seg.type !== MMOM.Statement.PROVABLE) throw new Error('verify called on not-$p');
 
     var frame = this.frame;
     if (frame.errors.length) return mungeErrors(MMOM.ErrorLocation.statement(this.seg), frame.errors);
@@ -340,7 +340,7 @@ MMVerifyState.prototype.checkProof = function () {
 
         var i = 0, k = 0, j, ch, preload=[], chunk, can_save=false, ref;
         for (i = 0; i < frame.mand.length; i++) {
-            ref = this.check(-1, this.segments[frame.mand[i].stmt].label);
+            ref = this.check(-1, this.statements[frame.mand[i].stmt].label);
             if (!ref) return this.errors;
             preload.push(ref);
         }

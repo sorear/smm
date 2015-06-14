@@ -22,8 +22,8 @@ write(ConsoleErrorFormatter(db.plugins.scoper.errors));
 time_1 = Date.now();
 var verifd = 0;
 Verify.install(db);
-db.segments.forEach(function (s,ix) {
-    if (s.type === MMOM.Segment.PROVABLE) {
+db.statements.forEach(function (s,ix) {
+    if (s.type === MMOM.Statement.PROVABLE) {
         verifd++;
         var err = Verify.install(db).verify(ix,false);
         if (err.length) write(`${s.label} ERR\n`);
