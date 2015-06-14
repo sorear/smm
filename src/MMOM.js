@@ -682,6 +682,28 @@ function parseSync(name, resolver) {
     return new MMOMScanner(new MMOMScanContext(name, resolve, true).initialZone(name)).scan();
 };
 
+function parseAsync(name, resolver) {
+    return new Promise(function (resolve, reject) {
+        function retry() {
+            if (!scanner) return;
+            var db = scanner.scan();
+            if (!db) return;
+            scanner = null;
+            resolve(db);
+        }
+
+        function handler(source) {
+            new Promise(function (resolve2) { resolve2(resolver(source.name)); }).then(
+                function (text) { source.text = text; retry(); },
+                function (err)  { source.text = ''; source.failed = err || 'false'; retry(); }
+            );
+        }
+
+        var scanner = new MMOMScanner(new MMOMScanContext(name, handler, false).initialZone(name));
+        retry();
+    });
+}
+
 return {
     Source: MMOMSource,
     Error: MMOMError,
@@ -691,6 +713,7 @@ return {
     Database: MMOMDatabase,
     ScanContext: MMOMScanContext,
     parseSync: parseSync,
+    parseAsync: parseAsync,
 };
 
 });

@@ -26,6 +26,7 @@
   "dependencies": {
     "BigInt": "^5.5.3",
     "amdefine": "^0.1.0",
-    "argparser": "^0.2.2"
+    "argparser": "^0.2.2",
+    "fs-promise": "^0.3.1"
   }
 }

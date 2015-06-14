@@ -8,47 +8,24 @@ var rl = require('readline').createInterface({
 var MMOM = require('../src/MMOM');
 var Scoper = require('../src/Scoper');
 var Verify = require('../src/Verify');
+var ConsoleErrorFormatter = require('../src/ConsoleErrorFormatter');
 
 rl.setPrompt('smm> ');
 rl.prompt();
 
 var db;
 
-function read_db(fname, cb) {
-    function retry() {
-        if (done) return;
-        if (db = scanner.scan()) {
-            done = true;
-            cb();
-        }
-    }
-    var done;
-    var scanner = new MMOM.Scanner(new MMOM.ScanContext(fname, function (src) {
-        require('fs').readFile(fname, 'utf8', function (err, text) {
-            if (err) {
-                src.failed = true;
-                src.text = '';
-                console.log(err);
-            }
-            else {
-                src.text = text;
-            }
-            process.nextTick(retry);
-        });
-    }, false).initialZone(fname));
-    process.nextTick(retry);
-}
-
 rl.on('line', function (l) {
     var match;
     if (match = /^read (.*)/.exec(l)) {
         console.log('reading',match[1]);
         rl.pause();
-        read_db(match[1], function () {
-            db.scanErrors.forEach(function(e) { console.log(e.toString()); });
-            Scoper.install(db).errors.forEach(function(e) { console.log(e.toString()); });
+        MMOM.parseAsync(match[1], function (fname) { return require('fs-promise').readFile(fname, 'utf8'); }).then(function (parsed) {
+            db = parsed;
+            console.log(ConsoleErrorFormatter(db.scanErrors));
+            console.log(ConsoleErrorFormatter(Scoper.install(db).errors));
             rl.prompt();
-        });
+        }, function (err) { console.log('should not get here',err); });
     }
     else if (l === 'exit') {
         rl.close();
@@ -73,8 +50,7 @@ rl.on('line', function (l) {
             console.log('not a $p');
         }
         else {
-            let err = Verify.install(db).verify(+match[1]);
-            err.forEach(function(e) { console.log(e.toString()); });
+            console.log(ConsoleErrorFormatter(Verify.install(db).verify(+match[1])));
         }
         rl.prompt();
     }
