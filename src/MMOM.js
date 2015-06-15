@@ -190,6 +190,10 @@ MMOMErrorLocation.scanToken = function (statement, source, pos) {
 };
 
 MMOMErrorLocation._functional = function (statement, kind, ary, ix) {
+    if (ix >= ary.length) {
+        ary = statement.startPos;
+        ix = 0;
+    }
     return new MMOMErrorLocation(kind, statement, ary[ix], ary[ix+1], ary[ix].tokenEnd(ary[ix+1]), null);
 };
 
