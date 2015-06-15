@@ -37,7 +37,7 @@ rl.on('line', function (l) {
             console.log('no database');
         }
         else {
-            console.log(db.scoper.getSym(match[1])); //NOT API
+            console.log(db.scoper.lookup(match[1])); //NOT API
         }
         rl.prompt();
     }

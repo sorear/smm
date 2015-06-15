@@ -6,7 +6,7 @@ function src(x) {
     beforeAll(function () {
         db = MMOM.parseSync('afile',x);
         if (db.scanner.errors.length) throw new Error('unexpected scan errors');
-        vErr = db.verifier.errors( db.statements[db.scoper.getSym('test').labelled] );
+        vErr = db.verifier.errors( db.scoper.lookup('test').labelled );
     });
 }
 function deep(x) { console.log(require('util').inspect(x,{depth:null,colors:true})); }

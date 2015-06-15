@@ -107,12 +107,12 @@ MMVerifyState.prototype.check = function (i, label) {
     if (!oframe) {
         sym = this.scoper.getSym(label);
 
-        if (!sym || sym.labelled < 0) {
+        if (!sym || !sym.labelled) {
             this.errors = [this.proofError(i,'no-such-assertion')];
             return null;
         }
 
-        oframe = this.scoper.getFrame(sym.labelled);
+        oframe = this.scoper.getFrame(sym.labelled.index);
         this.aframes.set(label, oframe);
     }
 

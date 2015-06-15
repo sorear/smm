@@ -78,10 +78,23 @@ MMScoper.prototype.addError = function (loc,code,data) {
     l1.push(loc.error('scope', code, data));
 };
 
+function SymbolRecord(scoper) {
+    this.scoper = scoper;
+    this.labelled = null;
+    this.math = [];
+    this.mathix = [];
+    this.float = [];
+    this.checkGen = -1;
+}
+
 // note, even with invalid input we do not allow the symbol table to contain overlapping active ranges for $v/$f.  so it is only necessary to check the last math entry
 MMScoper.prototype.getSym = function (label) {
     var symtab = this.symtab, r;
-    return symtab.get(label) || (symtab.set(label, r = { labelled: -1, math: [], mathix: [], float: [], checkGen: -1 }), r);
+    return symtab.get(label) || (symtab.set(label, r = new SymbolRecord(this)), r);
+};
+
+MMScoper.prototype.lookup = function (sym) {
+    return this.symtab.get(sym);
 };
 
 function ELsym(statements, sym, ix) { return EL.math(statements[sym.math[ix]], sym.mathix[ix]); }
@@ -92,8 +105,8 @@ MMScoper.prototype.labelCheck = function (segix) {
     // record label
     var segtab = this.db.statements;
     var sym = this.getSym(segtab[segix].label);
-    if (sym.labelled >= 0) {
-        this.addError(EL.label(segtab[segix]), 'label-used-twice', { prev: EL.label(segtab[sym.labelled]) });
+    if (sym.labelled) {
+        this.addError(EL.label(segtab[segix]), 'label-used-twice', { prev: EL.label(sym.labelled) });
         return;
     }
 
@@ -101,7 +114,7 @@ MMScoper.prototype.labelCheck = function (segix) {
         this.addError(EL.label(segtab[segix]), 'math-then-label', { prev: ELsym(segtab,sym,0) });
     }
 
-    sym.labelled = segix;
+    sym.labelled = segtab[segix];
 };
 
 var HIGHSEG = MMScoper.HIGHSEG = -1 >>> 1;
@@ -193,8 +206,8 @@ MMScoper.prototype._scan = function () {
                 // error if not top scope
                 for (i = 0; i < seg.math.length; i++) {
                     sym = this.getSym(seg.math[i]);
-                    if (sym.labelled >= 0) {
-                        this.addError(EL.math(seg, i), 'label-then-const', { prev: EL.label(statements[sym.labelled]) });
+                    if (sym.labelled) {
+                        this.addError(EL.math(seg, i), 'label-then-const', { prev: EL.label(sym.labelled) });
                     }
 
                     if (sym.math.length) {
@@ -215,8 +228,8 @@ MMScoper.prototype._scan = function () {
                 ends_ary[segix] = HIGHSEG;
                 for (i = 0; i < seg.math.length; i++) {
                     sym = this.getSym(seg.math[i]);
-                    if (sym.labelled >= 0) {
-                        this.addError(EL.math(seg, i), 'label-then-var', { prev: EL.label(statements[sym.labelled]) });
+                    if (sym.labelled) {
+                        this.addError(EL.math(seg, i), 'label-then-var', { prev: EL.label(sym.labelled) });
                     }
 
                     if (sym.math.length && ends_ary[sym.math[sym.math.length - 1]] === HIGHSEG) {

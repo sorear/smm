@@ -90,6 +90,16 @@ when they are applicable, they will always be present even if empty.
 
 A statement which is in a database knows its database and index.
 
+=== Scoper
+
+This module calculates scopes and symbol tables.
+
+    let sym = database.scoper.lookup('ruc')
+    database.verifier.errors(sym.labelled)
+
+Symbol table entries are returned as objects with slots for different types of usage of symbols.
+Currently only labelled (find the statement with this label) has API status.
+
 === Verifier
 
 This is the standard-mode verifier; it does not exploit statement parsing (that works only for set.mm).
