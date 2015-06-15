@@ -66,10 +66,6 @@ var ESSENTIAL = MMOM.Statement.ESSENTIAL;
 var FLOATING = MMOM.Statement.FLOATING;
 var DISJOINT = MMOM.Statement.DISJOINT;
 
-MMScoper.prototype.getPos = function (pos,ix) {
-    return pos.slice(2*ix,2*ix+2);
-};
-
 MMScoper.prototype.addError = function (loc,code,data) {
     var l1 = this._errors.get(loc.statement);
     if (!l1) {
@@ -155,6 +151,10 @@ MMScoper.prototype.mathCheck = function (segix) {
             }
         }
     }
+};
+
+MMScoper.prototype.statementScopeEnd = function (stmt) {
+    return this.ends_ary[stmt.index];
 };
 
 MMScoper.prototype._update = function () {
@@ -315,6 +315,7 @@ MMScoper.prototype._scan = function () {
                 this.labelCheck(segix);
                 this.mathCheck(segix);
                 chains_ary[segix] = open_ed_ptr;
+                ends_ary[segix] = HIGHSEG;
                 break;
         }
     }
