@@ -6,7 +6,7 @@ function src(x) {
     beforeAll(function () {
         db = MMOM.parseSync('afile',x);
         if (db.scanErrors.length) throw new Error('unexpected scan errors');
-        vErr = db.verifier.verify( db.scoper.getSym('test').labelled );
+        vErr = db.verifier.errors( db.statements[db.scoper.getSym('test').labelled] );
     });
 }
 function deep(x) { console.log(require('util').inspect(x,{depth:null,colors:true})); }
@@ -55,4 +55,12 @@ cases.forEach(function (cc) {
         src(cc.src);
         errs(cc.errs);
     });
+});
+
+describe('allErrors:', function () {
+    beforeAll(function () { db = MMOM.parseSync('afile','$c x $. 1 $a x $. 2 $p x $= ? $. 3 $p x $= 1 $. 4 $p x $= ? $.'); });
+    it('size', function () { expect(db.verifier.allErrors.size).toBe(2); });
+    it('has 2', function () { expect(db.verifier.allErrors.get(db.statement(2)).length).toBe(1); });
+    it('has 4', function () { expect(db.verifier.allErrors.get(db.statement(4)).length).toBe(1); });
+    it('has not 3', function () { expect(db.verifier.allErrors.has(db.statement(3))).toBe(false); });
 });

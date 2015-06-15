@@ -50,7 +50,7 @@ rl.on('line', function (l) {
             console.log('not a $p');
         }
         else {
-            console.log(ConsoleErrorFormatter(db.verifier.verify(+match[1]))); //NOT API
+            console.log(ConsoleErrorFormatter(db.verifier.errors(db.statement(+match[1])))); //NOT API
         }
         rl.prompt();
     }

@@ -89,3 +89,17 @@ when they are applicable, they will always be present even if empty.
     statement === database.statement(index)
 
 A statement which is in a database knows its database and index.
+
+=== Verifier
+
+This is the standard-mode verifier; it does not exploit statement parsing (that works only for set.mm).
+It implements the common error checking protocol but has no other API.
+
+=== Errors
+
+    import 'Verifier'
+    array_of_errors = database.verifier.errors(statement)
+    map_of_errors = database.verifier.allErrors
+
+Several analyzers have the capability to generate warnings or errors while analyzing the database.
+These analyzers implement a common API: `errors` fetches a list of errors for a specific statement, `allErrors` fetches a map with error data for each statement with at least one error.

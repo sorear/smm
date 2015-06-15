@@ -38,6 +38,10 @@ function MMVerifyStandard(db) {
     this.db = db;
     this.scoper = db.scoper;
     this.aframes = new Map();
+
+    this._checkedAll = false;
+    this._checked = new Set();
+    this._errorMap = new Map();
 }
 
 MMOM.Database.registerAnalyzer('verifier', MMVerifyStandard);
@@ -426,7 +430,7 @@ MMVerifyState.prototype.checkProof = function () {
     return [];
 };
 
-MMVerifyStandard.prototype.verify = function (segix) {
+MMVerifyStandard.prototype._verify = function (segix) {
     try {
         return (new MMVerifyState(this, segix, false)).checkProof();
     } catch (e) {
@@ -439,5 +443,33 @@ MMVerifyStandard.prototype.verify = function (segix) {
         }
     }
 };
+
+MMVerifyStandard.prototype.errors = function (stmt) {
+    if (!(stmt instanceof MMOM.Statement) || stmt.database !== this.db) throw new TypeError('bad statement to verify');
+    if (this._checked.has(stmt.index)) {
+        return this._errorMap.get(stmt) || [];
+    }
+    else {
+        var err = this._verify(stmt.index);
+        this._checked.add(stmt.index);
+        if (err.length) this._errorMap.set(stmt,err);
+        return err;
+    }
+};
+
+Object.defineProperty(MMVerifyStandard.prototype, 'allErrors', { get: function () {
+    if (!this._checkedAll) {
+        for (var i = 0; i < this.db.statements.length; i++) {
+            var s = this.db.statements[i];
+            if (s.type === MMOM.Statement.PROVABLE && !this._checked.has(i)) {
+                var err = this._verify(i);
+                this._checked.add(i);
+                if (err.length) this._errorMap.set(s,err);
+            }
+        }
+        this._checkedAll = true;
+    }
+    return this._errorMap;
+} });
 
 });
