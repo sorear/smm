@@ -97,13 +97,15 @@ It implements the common error checking protocol but has no other API.
 
 === Errors
 
-    import 'Scoper'
-    array_of_errors = database.scoper.errors(statement)
-    map_of_errors = database.scoper.allErrors
+....
+import 'Scoper'
+array_of_errors = database.scoper.errors(statement)
+map_of_errors = database.scoper.allErrors
 
-    import 'Verifier'
-    array_of_errors = database.verifier.errors(statement)
-    map_of_errors = database.verifier.allErrors
+import 'Verifier'
+array_of_errors = database.verifier.errors(statement)
+map_of_errors = database.verifier.allErrors
+....
 
 Several analyzers have the capability to generate warnings or errors while analyzing the database.
 These analyzers implement a common API: `errors` fetches a list of errors for a specific statement, `allErrors` fetches a map with error data for each statement with at least one error.
@@ -111,3 +113,7 @@ These analyzers implement a common API: `errors` fetches a list of errors for a 
     array_of_errors = database.scanner.errors
 
 Scanner errors are reported differently because they cannot generally be linked to a statement.
+
+    process.stdout.write( error.toConsoleString(), 'utf8' );
+
+Renders an error as a string containing newlines for human consumption.

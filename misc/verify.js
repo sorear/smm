@@ -3,7 +3,7 @@ var write = function (str) { process.stdout.write(str.toString(), 'utf8'); };
 var MMOM = require('../src/MMOM.js');
 require('../src/Scoper.js');
 require('../src/Verifier.js');
-var ConsoleErrorFormatter = require('../src/ConsoleErrorFormatter.js');
+require('../src/ConsoleErrorFormatter.js');
 
 function time(why,f) {
     var time_1 = Date.now();
@@ -16,15 +16,15 @@ var db;
 
 time('parse', function () {
     db = MMOM.parseSync(process.argv[2], function (s) { return require('fs').readFileSync(s, 'utf8'); });
-    write(ConsoleErrorFormatter(db.scanner.errors)); //NOT API
+    db.scanner.errors.forEach(function (e) { write(e.toConsoleString()); });
 });
 time('scope', function () {
     db.scoper.allErrors.forEach(function (errs, s) {
-        write(ConsoleErrorFormatter(errs)); //NOT API
+        errs.forEach(function (e) { write(e.toConsoleString()); });
     });
 });
 time('verify', function () {
     db.verifier.allErrors.forEach(function (errs, s) {
-        write(ConsoleErrorFormatter(errs)); //NOT API
+        errs.forEach(function (e) { write(e.toConsoleString()); });
     });
 });
