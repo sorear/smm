@@ -22,8 +22,10 @@ rl.on('line', function (l) {
         rl.pause();
         MMOM.parseAsync(match[1], function (fname) { return require('fs-promise').readFile(fname, 'utf8'); }).then(function (parsed) {
             db = parsed;
-            console.log(ConsoleErrorFormatter(db.scanErrors)); //NOT API
-            console.log(ConsoleErrorFormatter(db.scoper.errors)); //NOT API
+            console.log(ConsoleErrorFormatter(db.scanner.errors)); //NOT API
+            db.scoper.allErrors.forEach(function (elist) {
+                console.log(ConsoleErrorFormatter(elist)); //NOT API
+            });
             rl.prompt();
         }, function (err) { console.log('should not get here',err); });
     }

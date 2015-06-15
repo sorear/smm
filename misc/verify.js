@@ -16,12 +16,15 @@ var db;
 
 time('parse', function () {
     db = MMOM.parseSync(process.argv[2], function (s) { return require('fs').readFileSync(s, 'utf8'); });
-    write(ConsoleErrorFormatter(db.scanErrors));
+    write(ConsoleErrorFormatter(db.scanner.errors)); //NOT API
 });
-time('scope', function () { write(ConsoleErrorFormatter(db.scoper.errors)); });
+time('scope', function () {
+    db.scoper.allErrors.forEach(function (errs, s) {
+        write(ConsoleErrorFormatter(errs)); //NOT API
+    });
+});
 time('verify', function () {
     db.verifier.allErrors.forEach(function (errs, s) {
-        write(`${s.label} ERR\n`);
-        write(ConsoleErrorFormatter(errs));
+        write(ConsoleErrorFormatter(errs)); //NOT API
     });
 });

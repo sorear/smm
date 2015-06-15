@@ -633,7 +633,7 @@ MMOMScanner.prototype.scan = function () {
                     if (token === '') {
                         if (!this.reparsing) {
                             this.db.statements = this.statements;
-                            this.db.scanErrors = this.errors;
+                            this.db.scanner = { errors: this.errors };
                         }
                         if (this.index !== this.statement_start) this.newSegment(this.index);
                         if (this.reparsing)
@@ -665,7 +665,7 @@ var KnownAnalyzerKeys = [];
 
 function MMOMDatabase() {
     this.statements = null;
-    this.scanErrors = null;
+    this.scanner = null;
     for (var i = 0; i < KnownAnalyzerKeys.length; i++) {
         this[KnownAnalyzerKeys[i]] = null;
     }

@@ -5,12 +5,12 @@ function src(x) {
     beforeAll(function () { db = MMOM.parseSync('afile',x); });
 }
 function deep(x) { console.log(require('util').inspect(x,{depth:null,colors:true})); }
-function err(db,i) { var e = db.scanErrors[i]; return e ? [ e.location.source.name, e.location.from, e.category, e.code ] : []; }
+function err(db,i) { var e = db.scanner.errors[i]; return e ? [ e.location.source.name, e.location.from, e.category, e.code ] : []; }
 function seg(db,i) { var e = db.statements[i]; return e ? [ e.type, e.raw, e.math, e.proof ] : []; }
 function seg2(db,i) { var e = db.statements[i]; return e ? [ e.type, e.raw, e.math, e.proof, e.label ] : []; }
 function pos(db,i,s) { return db.statements[i][s].map(function (v,ix) { return ix%2 ? v : v.name; }); }
 function errs(es) {
-    it(`has ${es.length} errors`, function () { expect(db.scanErrors.length).toBe(es.length); });
+    it(`has ${es.length} errors`, function () { expect(db.scanner.errors.length).toBe(es.length); });
     es.forEach(function (e,ix) {
         it(`error ${ix}: ${e[3]}`, function () { expect(err(db,ix)).toEqual(e); });
     });

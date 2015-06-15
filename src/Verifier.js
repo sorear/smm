@@ -446,6 +446,7 @@ MMVerifyStandard.prototype._verify = function (segix) {
 
 MMVerifyStandard.prototype.errors = function (stmt) {
     if (!(stmt instanceof MMOM.Statement) || stmt.database !== this.db) throw new TypeError('bad statement to verify');
+    if (stmt.type !== MMOM.Statement.PROVABLE) return [];
     if (this._checked.has(stmt.index)) {
         return this._errorMap.get(stmt) || [];
     }

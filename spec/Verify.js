@@ -5,7 +5,7 @@ var db, vErr;
 function src(x) {
     beforeAll(function () {
         db = MMOM.parseSync('afile',x);
-        if (db.scanErrors.length) throw new Error('unexpected scan errors');
+        if (db.scanner.errors.length) throw new Error('unexpected scan errors');
         vErr = db.verifier.errors( db.statements[db.scoper.getSym('test').labelled] );
     });
 }

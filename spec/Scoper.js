@@ -1,17 +1,18 @@
 var MMOM = require('../src/MMOM.js');
 require('../src/Scoper.js');
-var db;
+var db, errlist;
 function src(x) {
     beforeAll(function () {
         db = MMOM.parseSync('afile',x);
-        if (db.scanErrors.length) throw new Error('unexpected scan errors in scoper pass');
-        db.scoper;
+        if (db.scanner.errors.length) throw new Error('unexpected scan errors in scoper pass');
+        errlist = [];
+        db.scoper.allErrors.forEach(function (el) { errlist.push.apply(errlist, el); });
     });
 }
 function deep(x) { console.log(require('util').inspect(x,{depth:null,colors:true})); }
 
 function err(db,i) {
-    var e = db.scoper.errors[i];
+    var e = errlist[i];
     if (!e) return [];
     var o = [ e.location.source.name, e.location.from, e.category, e.code ];
     if (e.data && e.data.prev) o.push(e.data.prev.source.name, e.data.prev.from);
@@ -19,7 +20,7 @@ function err(db,i) {
 }
 
 function errs(es) {
-    it(`has ${es.length} errors`, function () { expect(db.scoper.errors.length).toBe(es.length); });
+    it(`has ${es.length} errors`, function () { expect(errlist.length).toBe(es.length); });
     es.forEach(function (e,ix) {
         it(`error ${ix}: ${e[3]}`, function () { expect(err(db,ix)).toEqual(e); });
     });

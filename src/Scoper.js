@@ -11,10 +11,10 @@ function MMScoper(db) {
     this.db = db;
     this.ends_ary = null;
     this.chains_ary = null;
-    this.errors = null;
+    this._errors = null;
     this.symtab = null;
     this.varSyms = null;
-    this.scan();
+    this._scan();
 }
 
 MMOM.Database.registerAnalyzer('scoper', MMScoper);
@@ -71,7 +71,11 @@ MMScoper.prototype.getPos = function (pos,ix) {
 };
 
 MMScoper.prototype.addError = function (loc,code,data) {
-    this.errors.push(loc.error('scope', code, data));
+    var l1 = this._errors.get(loc.statement);
+    if (!l1) {
+        this._errors.set(loc.statement, l1 = []);
+    }
+    l1.push(loc.error('scope', code, data));
 };
 
 // note, even with invalid input we do not allow the symbol table to contain overlapping active ranges for $v/$f.  so it is only necessary to check the last math entry
@@ -139,14 +143,14 @@ MMScoper.prototype.mathCheck = function (segix) {
     }
 };
 
-MMScoper.prototype.scan = function () {
+MMScoper.prototype._scan = function () {
     var segix, statements = this.db.statements, seg;
     var open_vf_stack = []; // includes a -1 sentinel for each open scope
     var open_ed_ptr = -1;
     var scope_ed_stack = [];
     var open_stack = [];
     var i, j;
-    this.errors = [];
+    this._errors = new Map();
     var ends_ary = this.ends_ary = new Int32Array(statements.length); // efcv (always HIGHSEG for c)
     var chains_ary = this.chains_ary = new Int32Array(statements.length); // edap
     this.symtab = new Map();
@@ -460,6 +464,14 @@ function MMFrame(scoper, ix) {
 
 MMScoper.prototype.getFrame = function (ix) {
     return new MMFrame(this, ix);
+};
+
+Object.defineProperty(MMScoper.prototype, 'allErrors', { get: function () {
+    return this._errors;
+} });
+MMScoper.prototype.errors = function (stmt) {
+    if (!(stmt instanceof MMOM.Statement) || stmt.database !== this.db) throw new TypeError('bad statement');
+    return this._errors.get(stmt) || [];
 };
 
 });
