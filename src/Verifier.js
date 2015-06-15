@@ -431,6 +431,7 @@ MMVerifyState.prototype.checkProof = function () {
 };
 
 MMVerifyStandard.prototype._verify = function (segix) {
+    this.scoper._update(); // since we're bypassing the API for speed here
     try {
         return (new MMVerifyState(this, segix, false)).checkProof();
     } catch (e) {

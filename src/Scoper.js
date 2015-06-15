@@ -14,7 +14,7 @@ function MMScoper(db) {
     this._errors = null;
     this.symtab = null;
     this.varSyms = null;
-    this._scan();
+    this._dirty = true;
 }
 
 MMOM.Database.registerAnalyzer('scoper', MMScoper);
@@ -94,6 +94,7 @@ MMScoper.prototype.getSym = function (label) {
 };
 
 MMScoper.prototype.lookup = function (sym) {
+    if (this._dirty) this._scan();
     return this.symtab.get(sym);
 };
 
@@ -154,6 +155,10 @@ MMScoper.prototype.mathCheck = function (segix) {
             }
         }
     }
+};
+
+MMScoper.prototype._update = function () {
+    if (this._dirty) this._scan();
 };
 
 MMScoper.prototype._scan = function () {
@@ -318,6 +323,8 @@ MMScoper.prototype._scan = function () {
     for (i = 0; i < open_stack.length; i++) {
         this.addError(EL.statement(open_stack[i]), 'never-closed');
     }
+
+    this._dirty = false;
 };
 
 // pre-optimize a math string for 'substify' (non-ABR mode only)
@@ -480,10 +487,12 @@ MMScoper.prototype.getFrame = function (ix) {
 };
 
 Object.defineProperty(MMScoper.prototype, 'allErrors', { get: function () {
+    if (this._dirty) this._scan();
     return this._errors;
 } });
 MMScoper.prototype.errors = function (stmt) {
     if (!(stmt instanceof MMOM.Statement) || stmt.database !== this.db) throw new TypeError('bad statement');
+    if (this._dirty) this._scan();
     return this._errors.get(stmt) || [];
 };
 
