@@ -63,10 +63,11 @@ MMOMParser.prototype._extractRules = function () {
                 bad = true;
             }
             if (!bad) {
-                this._index.get(stmt.math[0]).push(stmt);
-                this._rules.set(stmt.index, {
-                    arity: 0, commands: [{ lit: stmt.math[1], index: -1, type: '' }], type: stmt.math[0], limit: this._scoper.statementScopeEnd(stmt)
-                });
+                var rule = {
+                    stmt: stmt, arity: 0, commands: [{ lit: stmt.math[1], index: -1, type: '' }], type: stmt.math[0], limit: this._scoper.statementScopeEnd(stmt)
+                };
+                this._index.get(stmt.math[0]).push(rule);
+                this._rules.set(stmt.index, rule);
             }
             continue;
         }
@@ -130,10 +131,11 @@ MMOMParser.prototype._extractRules = function () {
         }
 
         if (!bad) {
-            this._index.get(stmt.math[0]).push(stmt);
-            this._rules.set(stmt.index, {
-                arity: frame.mand.length, commands: commands, type: stmt.math[0], limit: this._scoper.statementScopeEnd(stmt)
-            });
+            var rule = {
+                stmt: stmt, arity: frame.mand.length, commands: commands, type: stmt.math[0], limit: this._scoper.statementScopeEnd(stmt)
+            };
+            this._index.get(stmt.math[0]).push(rule);
+            this._rules.set(stmt.index, rule);
         }
     }
 };
@@ -145,9 +147,8 @@ function MMOMParseNode(syntax_axiom, children) {
 MMOMParseNode.prototype.dump = function () { return this.syntax_axiom.label + '(' + this.children.map(function (x) { return x.dump(); }).join(',') + ')'; };
 
 var STOP = { end: 0, tree: null };
-MMOMParser.prototype._packratTryRule = function (ctx, axiom, ix) {
-    var data = this._rules.get(axiom.index);
-    if (ctx.index < axiom.index || ctx.index >= data.limit) return STOP;
+MMOMParser.prototype._packratTryRule = function (ctx, data, ix) {
+    if (ctx.index < data.stmt.index || ctx.index >= data.limit) return STOP;
     var children = [];
     for (var j = 0; j < data.commands.length; j++) {
         if (data.commands[j].index >= 0) {
@@ -171,7 +172,7 @@ MMOMParser.prototype._packratTryRule = function (ctx, axiom, ix) {
         }
     }
 
-    return { end: ix, tree: new MMOMParseNode(axiom, children) };
+    return { end: ix, tree: new MMOMParseNode(data.stmt, children) };
 };
 
 MMOMParser.prototype._packratStep = function (ctx, type, ix) {
