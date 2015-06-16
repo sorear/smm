@@ -12,6 +12,7 @@ function MMOMParser(db) {
     this._scoper = db.scoper;
     this._errors = new Map();
     this._index = [];
+    this._thread = [];
     this._rules = new Map();
     this._parses = new Map();
 
@@ -45,6 +46,7 @@ MMOMParser.prototype._addError = function (loc,code,data) {
 MMOMParser.prototype._buildParser = function () {
     this._errors = new Map();
     this._index = [];
+    this._thread = [];
     this._rules = new Map();
     this._extractRules();
     this._dirty = false;
@@ -73,6 +75,38 @@ FactorTree.prototype.addNonterminal = function (goali) {
     if (!next) this.nonterminals[goali] = next = new FactorTree(this.nt_depth+1);
     return next;
 };
+
+FactorTree.prototype.toThread = function (depth,cont) {
+    if (this.terminals.size) {
+        var ncase = new Map();
+        this.terminals.forEach(function (v, k) {
+            ncase.set(k, v.toThread(depth+1,cont));
+        });
+        cont = new FactorThread(depth, null, 0, null, -1, ncase, cont, null);
+    }
+
+    for (var i = this.nonterminals.length - 1; i >= 0; i--) {
+        if (this.nonterminals[i])
+            cont = new FactorThread(depth, null, 0, null, i, null, cont, this.nonterminals[i].toThread(depth+1,cont));
+    }
+
+    for (var i = this.leaves.length - 1; i >= 0; i--) {
+        cont = new FactorThread(depth, this.leaves[i].stmt, this.leaves[i].limit, this.leaves[i].permute, -1, null, cont, null);
+    }
+
+    return cont;
+};
+
+function FactorThread(depth, statement, limit, permute, type, cases, next0, next1) {
+    this.depth = depth;
+    this.statement = statement;
+    this.limit = limit;
+    this.permute = permute;
+    this.type = type;
+    this.cases = cases;
+    this.next0 = next0;
+    this.next1 = next1;
+}
 
 MMOMParser.prototype._extractRules = function () {
     this._scoper._update(); // required for getFrame
@@ -156,7 +190,7 @@ MMOMParser.prototype._extractRules = function () {
                 }
 
                 commands.push({ lit: stmt.math[j], index: float, type: reforder });
-                permute[float] = nnonterm++;
+                permute[float] = j-1;
                 cursor = cursor.addNonterminal(reforder);
             }
             else {
@@ -172,6 +206,10 @@ MMOMParser.prototype._extractRules = function () {
             cursor.addLeaf(stmt, rule.limit, permute);
             this._rules.set(stmt.index, rule);
         }
+    }
+
+    for (var i = 0; i < this._order.length; i++) {
+        this._thread[i] = this._index[i].toThread(0, null);
     }
 };
 
@@ -231,11 +269,66 @@ MMOMParser.prototype._execTreeStep = function (ctx, node, ix, child_buffer, rres
 MMOMParser.prototype._packratStep = function (ctx, type, ix) {
     var memo = ctx.memo[type];
     if (memo[ix]) return memo[ix];
+    if (ctx.highwater === ix) { ctx.highwater_list.push(this._order[type]); }
 
+    var ip = this._thread[type];
+    var ixes = [];
+    ixes[0] = ix;
     var rres = { end: 0, tree: null };
     var child_buffer = [];
-    if (ctx.highwater === ix) { ctx.highwater_list.push(this._order[type]); }
-    this._execTreeStep(ctx, this._index[type], ix, child_buffer, rres, ix);
+
+    while (ip) {
+        var anix = ixes[ip.depth];
+        if (ip.cases) {
+            if (ctx.highwater === anix) {
+                if (anix !== ix) ip.cases.forEach(function (v,k) { ctx.highwater_list.push(k); });
+                if (anix < ctx.math.length) {
+                    var nip = ip.cases.get(ctx.math[anix]);
+                    if (nip) {
+                        ctx.highwater = anix+1;
+                        ctx.highwater_list.length = 0;
+                        ixes[ip.depth+1] = anix+1;
+                    }
+                    ip = nip || ip.next0;
+                }
+                else ip = ip.next0;
+            }
+            else {
+                if (anix < ctx.math.length) {
+                    var nip = ip.cases.get(ctx.math[anix]);
+                    ixes[ip.depth+1] = anix+1;
+                    ip = nip || ip.next0;
+                }
+                else ip = ip.next0;
+            }
+        }
+        else if (ip.statement) {
+            if (ctx.index >= ip.statement.index && ctx.index < ip.limit) {
+                var z = [];
+                for (var j = 0; j < ip.permute.length; j++) {
+                    z[j] = child_buffer[ip.permute[j]];
+                }
+                var p = new MMOMParserNode(ip.statement, z);
+                if (rres.tree) {
+                    ctx.amb = [ ix, { end: rres.end, tree: rres.tree }, { end: anix, tree: p } ];
+                }
+                rres.end = anix;
+                rres.tree = p;
+            }
+            ip = ip.next0;
+        }
+        else {
+            var res = this._packratStep(ctx, ip.type, anix);
+            if (res.tree) {
+                child_buffer[ip.depth] = res.tree;
+                ixes[ip.depth+1] = res.end;
+                ip = ip.next1;
+            }
+            else {
+                ip = ip.next0;
+            }
+        }
+    }
 
     return memo[ix] = rres;
 };
@@ -326,7 +419,6 @@ Object.defineProperty(MMOMParser.prototype, 'allErrors', { get: function () {
     if (!this._checkedAll) {
         for (var i = 0; i < this._db.statements.length; i++) {
             this._parseCheckStatement(this._db.statements[i]);
-            if (!(i % 1000)) process.stdout.write(`${i}/${this._db.statements.length}    \r`);
         }
         this._checkedAll = true;
     }
