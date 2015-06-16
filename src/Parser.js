@@ -11,7 +11,7 @@ function MMOMParser(db) {
     this._checkedAll = false;
     this._scoper = db.scoper;
     this._errors = new Map();
-    this._index = new Map();
+    this._index = [];
     this._rules = new Map();
     this._parses = new Map();
 
@@ -44,7 +44,7 @@ MMOMParser.prototype._addError = function (loc,code,data) {
 
 MMOMParser.prototype._buildParser = function () {
     this._errors = new Map();
-    this._index = new Map();
+    this._index = [];
     this._rules = new Map();
     this._extractRules();
     this._dirty = false;
@@ -54,7 +54,7 @@ MMOMParser.prototype._buildParser = function () {
 MMOMParser.prototype._extractRules = function () {
     this._scoper._update(); // required for getFrame
     for (var i = 0; i < this._order.length; i++) {
-        this._index.set(this._order[i], []);
+        this._index[i] = [];
     }
 
     for (var i = 0; i < this._db.statements.length; i++) {
@@ -70,9 +70,9 @@ MMOMParser.prototype._extractRules = function () {
             }
             if (!bad) {
                 var rule = {
-                    stmt: stmt, arity: 0, commands: [{ lit: stmt.math[1], index: -1, type: '' }], type: stmt.math[0], limit: this._scoper.statementScopeEnd(stmt)
+                    stmt: stmt, arity: 0, commands: [{ lit: stmt.math[1], index: -1, type: -1 }], type: stmt.math[0], limit: this._scoper.statementScopeEnd(stmt)
                 };
-                this._index.get(stmt.math[0]).push(rule);
+                this._index[order].push(rule);
                 this._rules.set(stmt.index, rule);
             }
             continue;
@@ -129,10 +129,10 @@ MMOMParser.prototype._extractRules = function () {
                     bad = true;
                 }
 
-                commands.push({ lit: stmt.math[j], index: float, type: type });
+                commands.push({ lit: stmt.math[j], index: float, type: reforder });
             }
             else {
-                commands.push({ lit: stmt.math[j], index: -1, type: '' });
+                commands.push({ lit: stmt.math[j], index: -1, type: -1 });
             }
         }
 
@@ -140,7 +140,7 @@ MMOMParser.prototype._extractRules = function () {
             var rule = {
                 stmt: stmt, arity: frame.mand.length, commands: commands, type: stmt.math[0], limit: this._scoper.statementScopeEnd(stmt)
             };
-            this._index.get(stmt.math[0]).push(rule);
+            this._index[order].push(rule);
             this._rules.set(stmt.index, rule);
         }
     }
@@ -183,14 +183,14 @@ MMOMParser.prototype._packratTryRule = function (ctx, data, ix) {
 };
 
 MMOMParser.prototype._packratStep = function (ctx, type, ix) {
-    var memo = ctx.memo.get(type);
+    var memo = ctx.memo[type];
     if (memo[ix]) return memo[ix];
     //console.log('Looking for',type,'at',ix);
-    var choices = this._index.get(type);
+    var choices = this._index[type];
     var parse;
 
     if (ctx.highwater === ix) {
-        ctx.highwater_list.push(type);
+        ctx.highwater_list.push(this._order[type]);
     }
 
     for (var i = 0; i < choices.length; i++) {
@@ -207,11 +207,13 @@ MMOMParser.prototype._packratStep = function (ctx, type, ix) {
 
 MMOMParser.prototype.parseMathString = function (goal, index, math) {
     if (this._dirty) this._buildParser();
-    var ctx = { memo: new Map(), math: math, index: index, amb: null, highwater: undefined, highwater_list: [] };
+    var goali = this._order.indexOf(goal);
+    if (goali < 0) throw new TypeError('bad goal');
+    var ctx = { memo: [], math: math, index: index, amb: null, highwater: undefined, highwater_list: [] };
     for (var i = 0; i < this._order.length; i++) {
-        ctx.memo.set(this._order[i], []);
+        ctx.memo[i] = [];
     }
-    var res = this._packratStep(ctx, goal, 0);
+    var res = this._packratStep(ctx, goali, 0);
     if (ctx.amb)
         return { error: 'ambiguous', edata: ctx.amb, tree: null };
     if (res.tree) {
@@ -222,9 +224,9 @@ MMOMParser.prototype.parseMathString = function (goal, index, math) {
 
     ctx.highwater = 0;
     for (var i = 0; i < this._order.length; i++) {
-        ctx.memo.set(this._order[i], []);
+        ctx.memo[i] = [];
     }
-    this._packratStep(ctx, goal, 0);
+    this._packratStep(ctx, goali, 0);
 
     return { error: 'no-parse', edata: { highwater: ctx.highwater, highwater_list: ctx.highwater_list }, tree: null };
 };
