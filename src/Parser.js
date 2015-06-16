@@ -100,12 +100,17 @@ FactorTree.prototype.toThread = function (depth,cont) {
 function FactorThread(depth, statement, limit, permute, type, cases, next0, next1) {
     this.depth = depth;
     this.statement = statement;
+    this.singleton = null;
     this.limit = limit;
     this.permute = permute;
     this.type = type;
     this.cases = cases;
     this.next0 = next0;
     this.next1 = next1;
+
+    if (this.statement && !this.permute.length) {
+        this.singleton = new MMOMParserNode(this.statement, []);
+    }
 }
 
 MMOMParser.prototype._extractRules = function () {
@@ -220,52 +225,6 @@ function MMOMParserNode(syntax_axiom, children) {
 MMOMParserNode.prototype.dump = function () { return this.syntax_axiom.label + '(' + this.children.map(function (x) { return x.dump(); }).join(',') + ')'; };
 MMOMParser.Node = MMOMParserNode;
 
-MMOMParser.prototype._execTreeStep = function (ctx, node, ix, child_buffer, rres, fix) {
-    for (var i = 0; i < node.leaves.length; i++) {
-        var l = node.leaves[i];
-        if (ctx.index >= l.stmt.index && ctx.index < l.limit) {
-            var z = [];
-            for (var j = 0; j < l.permute.length; j++) {
-                z[j] = child_buffer[l.permute[j]];
-            }
-            var p = new MMOMParserNode(l.stmt, z);
-            if (rres.tree) {
-                ctx.amb = [ fix, { end: rres.end, tree: rres.tree }, { end: ix, tree: p } ];
-            }
-            rres.end = ix;
-            rres.tree = p;
-        }
-    }
-    for (var i = 0; i < this._order.length; i++) {
-        if (node.nonterminals[i]) {
-            var res = this._packratStep(ctx, i, ix);
-            if (res.tree) {
-                child_buffer[node.nt_depth] = res.tree;
-                this._execTreeStep(ctx, node.nonterminals[i], res.end, child_buffer, rres, fix);
-            }
-        }
-    }
-    if (ctx.highwater === ix) {
-        if (ix !== fix) node.terminals.forEach(function (v,k) { ctx.highwater_list.push(k); });
-        if (ix < ctx.math.length) {
-            var nnode = node.terminals.get(ctx.math[ix]);
-            if (nnode) {
-                ctx.highwater = ix+1;
-                ctx.highwater_list.length = 0;
-                this._execTreeStep(ctx, nnode, ix+1, child_buffer, rres, fix);
-            }
-        }
-    }
-    else {
-        if (ix < ctx.math.length) {
-            var nnode = node.terminals.get(ctx.math[ix]);
-            if (nnode) {
-                this._execTreeStep(ctx, nnode, ix+1, child_buffer, rres, fix);
-            }
-        }
-    }
-};
-
 MMOMParser.prototype._packratStep = function (ctx, type, ix) {
     var memo = ctx.memo[type];
     if (memo[ix]) return memo[ix];
@@ -304,11 +263,14 @@ MMOMParser.prototype._packratStep = function (ctx, type, ix) {
         }
         else if (ip.statement) {
             if (ctx.index >= ip.statement.index && ctx.index < ip.limit) {
-                var z = [];
-                for (var j = 0; j < ip.permute.length; j++) {
-                    z[j] = child_buffer[ip.permute[j]];
+                var p = ip.singleton;
+                if (!p) {
+                    var z = [];
+                    for (var j = 0; j < ip.permute.length; j++) {
+                        z[j] = child_buffer[ip.permute[j]];
+                    }
+                    p = new MMOMParserNode(ip.statement, z);
                 }
-                var p = new MMOMParserNode(ip.statement, z);
                 if (rres.tree) {
                     ctx.amb = [ ix, { end: rres.end, tree: rres.tree }, { end: anix, tree: p } ];
                 }
