@@ -3,6 +3,7 @@ var write = function (str) { process.stdout.write(str.toString(), 'utf8'); };
 var MMOM = require('../src/MMOM.js');
 require('../src/Scoper.js');
 require('../src/Verifier.js');
+require('../src/Parser.js');
 require('../src/ConsoleErrorFormatter.js');
 
 function time(why,f) {
@@ -20,6 +21,12 @@ time('parse', function () {
 });
 time('scope', function () {
     db.scoper.allErrors.forEach(function (errs, s) {
+        errs.forEach(function (e) { write(e.toConsoleString()); });
+    });
+});
+time('parser', function () {
+    //db.parser._buildParser();
+    db.parser.allErrors.forEach(function (errs, s) {
         errs.forEach(function (e) { write(e.toConsoleString()); });
     });
 });
