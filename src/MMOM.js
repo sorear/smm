@@ -212,7 +212,7 @@ function MMOMError(location, category, code, data) {
     this.category = category;
     this.code = code;
     this.data = data || {};
-    if (!this.definition) throw new Error("No definition for generated error");
+    if (!this.definition) throw new Error(`No definition for generated error ${category}/${code}`);
 }
 
 MMOMError.prototype.toString = function() {

@@ -27,6 +27,12 @@ MMOM.Error.register('parser', 'syntax-with-dv', 'Axiom with a syntactic type cod
 MMOM.Error.register('parser', 'syntax-repeat-var', 'Variable may not be used more than once in a syntactic axiom«prev:Previous use:l»');
 MMOM.Error.register('parser', 'syntax-ref-nonsyntax', 'Syntactic axiom may not reference non-syntactic variables');
 MMOM.Error.register('parser', 'syntax-left-recursive', 'A syntax axiom may only left recurse into rules with tighter type codes');
+MMOM.Error.register('parser', 'essen-syntax', 'A $e hypothesis may not use a syntactic category');
+MMOM.Error.register('parser', 'unconfigured-type', 'Unconfigured type code');
+MMOM.Error.register('parser', 'ambiguous', 'Grammatical ambiguity detected; from here can be parsed «one:s» or «two:s»');
+MMOM.Error.register('parser', 'parse-error', 'Parsing failed here; expected any of: «expect:m»');
+MMOM.Error.register('parser', 'truncated', 'Statement is incomplete; expected any of: «expect:m»');
+MMOM.Error.register('parser', 'trailing-symbols', 'Unexpected symbols after statement');
 
 MMOMParser.prototype._addError = function (loc,code,data) {
     var l1 = this._errors.get(loc.statement);
@@ -91,7 +97,7 @@ MMOMParser.prototype._extractRules = function () {
                 varOrder.set(frame.mandVars[frame.mand[j].ix],j);
             }
             else {
-                this._addError(EL.statement(stmt),'syntax-with-e',{ hyp: EL.statement(frame.mand[j].stmt) });
+                this._addError(EL.statement(stmt),'syntax-with-e',{ hyp: EL.statement(this._db.statements[frame.mand[j].stmt]) });
                 bad = true;
             }
         }
@@ -140,11 +146,12 @@ MMOMParser.prototype._extractRules = function () {
     }
 };
 
-function MMOMParseNode(syntax_axiom, children) {
+function MMOMParserNode(syntax_axiom, children) {
     this.syntax_axiom = syntax_axiom;
     this.children = children;
 }
-MMOMParseNode.prototype.dump = function () { return this.syntax_axiom.label + '(' + this.children.map(function (x) { return x.dump(); }).join(',') + ')'; };
+MMOMParserNode.prototype.dump = function () { return this.syntax_axiom.label + '(' + this.children.map(function (x) { return x.dump(); }).join(',') + ')'; };
+MMOMParser.Node = MMOMParserNode;
 
 var STOP = { end: 0, tree: null };
 MMOMParser.prototype._packratTryRule = function (ctx, data, ix) {
@@ -172,7 +179,7 @@ MMOMParser.prototype._packratTryRule = function (ctx, data, ix) {
         }
     }
 
-    return { end: ix, tree: new MMOMParseNode(data.stmt, children) };
+    return { end: ix, tree: new MMOMParserNode(data.stmt, children) };
 };
 
 MMOMParser.prototype._packratStep = function (ctx, type, ix) {
@@ -226,13 +233,15 @@ MMOMParser.prototype._parseCheckStatement = function (stmt) {
     if (stmt.type !== MMOM.Statement.ESSENTIAL && stmt.type !== MMOM.Statement.PROVABLE && stmt.type !== MMOM.Statement.AXIOM) return;
     var role = this._roles.get(stmt.math[0]);
     if (!role) {
-        if (this._order.indexOf(stmt.math[0]) >= 0) {
-            if (stmt.type === MMOM.Statement.ESSENTIAL) {
-                this._addError(EL.math(stmt,0),'essen-syntax');
+        if (stmt.math.length) {
+            if (this._order.indexOf(stmt.math[0]) >= 0) {
+                if (stmt.type === MMOM.Statement.ESSENTIAL) {
+                    this._addError(EL.math(stmt,0),'essen-syntax');
+                }
             }
-        }
-        else {
-            this._addError(EL.math(stmt,0),'unconfigured-type');
+            else {
+                this._addError(EL.math(stmt,0),'unconfigured-type');
+            }
         }
         this._parses.set(stmt.index, null);
         return;
@@ -246,7 +255,7 @@ MMOMParser.prototype._parseCheckStatement = function (stmt) {
     }
 
     if (res.error === 'ambiguous') {
-        this._addError(EL.math(stmt,res.edata[0]+1),'ambiguous',{ one: res.edata[1].syntax_axiom.label, two: res.edata[2].syntax_axiom.label });
+        this._addError(EL.math(stmt,res.edata[0]+1),'ambiguous',{ one: res.edata[1].tree.syntax_axiom.label, two: res.edata[2].tree.syntax_axiom.label });
     }
     else if (res.error === 'no-parse') {
         if (res.edata.highwater + 1 === stmt.math.length) {
@@ -280,16 +289,21 @@ Object.defineProperty(MMOMParser.prototype, 'allErrors', { get: function () {
     if (!this._checkedAll) {
         for (var i = 0; i < this._db.statements.length; i++) {
             this._parseCheckStatement(this._db.statements[i]);
-            if (!(i % 1000)) process.stdout.write('.');
         }
         this._checkedAll = true;
     }
     return this._errors;
 } });
-//MMScoper.prototype.errors = function (stmt) {
-//    if (!(stmt instanceof MMOM.Statement) || stmt.database !== this.db) throw new TypeError('bad statement');
-//    if (this._dirty) this._scan();
-//    return this._errors.get(stmt) || [];
-//};
+MMOMParser.prototype.errors = function (stmt) {
+    if (!(stmt instanceof MMOM.Statement) || stmt.database !== this._db) throw new TypeError('bad statement');
+    if (this._dirty) this._buildParser();
+    if (stmt.type === MMOM.Statement.ESSENTIAL || stmt.type === MMOM.Statement.PROVABLE || stmt.type === MMOM.Statement.AXIOM) {
+        if (!this._parses.has(stmt.index)) {
+            this._parseCheckStatement(stmt);
+        }
+    }
+    return this._errors.get(stmt) || [];
+};
 
+return MMOMParser;
 });
