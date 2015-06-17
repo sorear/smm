@@ -1,4 +1,5 @@
 var MMOM = require('../src/MMOM.js');
+var expect = require('chai').expect;
 require('../src/Scoper.js');
 var db, errlist;
 function src(x) {
@@ -20,9 +21,9 @@ function err(db,i) {
 }
 
 function errs(es) {
-    it(`has ${es.length} errors`, function () { expect(errlist.length).toBe(es.length); });
+    it(`has ${es.length} errors`, function () { expect(errlist.length).equal(es.length); });
     es.forEach(function (e,ix) {
-        it(`error ${ix}: ${e[3]}`, function () { expect(err(db,ix)).toEqual(e); });
+        it(`error ${ix}: ${e[3]}`, function () { expect(err(db,ix)).eql(e); });
     });
 }
 

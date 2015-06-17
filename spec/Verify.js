@@ -1,4 +1,5 @@
 var MMOM = require('../src/MMOM.js');
+var expect = require('chai').expect;
 require('../src/Scoper.js');
 require('../src/Verifier.js');
 var db, vErr;
@@ -20,9 +21,9 @@ function err(i) {
 }
 
 function errs(es) {
-    it(`has ${es.length} errors`, function () { expect(vErr.length).toBe(es.length); });
+    it(`has ${es.length} errors`, function () { expect(vErr.length).equal(es.length); });
     es.forEach(function (e,ix) {
-        it(`error ${ix}: ${e[3]}`, function () { expect(err(ix)).toEqual(e); });
+        it(`error ${ix}: ${e[3]}`, function () { expect(err(ix)).eql(e); });
     });
 }
 
@@ -59,8 +60,8 @@ cases.forEach(function (cc) {
 
 describe('allErrors:', function () {
     beforeAll(function () { db = MMOM.parseSync('afile','$c x $. 1 $a x $. 2 $p x $= ? $. 3 $p x $= 1 $. 4 $p x $= ? $.'); });
-    it('size', function () { expect(db.verifier.allErrors.size).toBe(2); });
-    it('has 2', function () { expect(db.verifier.allErrors.get(db.statement(2)).length).toBe(1); });
-    it('has 4', function () { expect(db.verifier.allErrors.get(db.statement(4)).length).toBe(1); });
-    it('has not 3', function () { expect(db.verifier.allErrors.has(db.statement(3))).toBe(false); });
+    it('size', function () { expect(db.verifier.allErrors.size).equal(2); });
+    it('has 2', function () { expect(db.verifier.allErrors.get(db.statement(2)).length).equal(1); });
+    it('has 4', function () { expect(db.verifier.allErrors.get(db.statement(4)).length).equal(1); });
+    it('has not 3', function () { expect(db.verifier.allErrors.has(db.statement(3))).equal(false); });
 });

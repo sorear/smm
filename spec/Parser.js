@@ -1,4 +1,5 @@
 var MMOM = require('../src/MMOM');
+var expect = require('chai').expect;
 require('../src/Parser');
 var db,vErr;
 
@@ -19,9 +20,9 @@ function ferr(e) {
 function errs(lbl,es) {
     function get() { vErr = db.parser.errors( db.scoper.lookup(lbl).labelled ); }
     es.forEach(function (e,ix) {
-        it(`error ${ix}: ${e[3]}`, function () { get(); expect(ferr(vErr[ix])).toEqual(e); });
+        it(`error ${ix}: ${e[3]}`, function () { get(); expect(ferr(vErr[ix])).eql(e); });
     });
-    it(`has only ${es.length} errors`, function () { get(); expect(vErr.slice(es.length).map(ferr)).toEqual([]); });
+    it(`has only ${es.length} errors`, function () { get(); expect(vErr.slice(es.length).map(ferr)).eql([]); });
 }
 var LANG = '$c |- wff ( ) A $. $v ph ps $. f0 $f wff ph $. f1 $f wff ps $. w0 $a wff A $. w1 $a wff ( ph ps ) $. ';
 var cases = [
@@ -54,9 +55,9 @@ cases.forEach(function (cc) {
         if (cc.tree) Object.keys(cc.tree).forEach(function (tr) {
             it(`parse for ${tr}`, function () {
                 var pars = db.parser.parseStatement(db.scoper.lookup(tr).labelled);
-                expect(pars && pars.dump()).toBe(cc.tree[tr]);
+                expect(pars && pars.dump()).equal(cc.tree[tr]);
             });
         });
-        it('has no other errors', function () { var o=[]; db.parser.allErrors.forEach(function(v,k){if(!k.label||!cc.err[k.label])o.push(k.label||k.index);}); expect(o).toEqual([]); });
+        it('has no other errors', function () { var o=[]; db.parser.allErrors.forEach(function(v,k){if(!k.label||!cc.err[k.label])o.push(k.label||k.index);}); expect(o).eql([]); });
     });
 });
