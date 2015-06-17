@@ -13,6 +13,7 @@ function MMOMParser(db) {
     this._errors = new Map();
     this._index = [];
     this._thread = [];
+    this._initial = [];
     this._rules = new Map();
     this._parses = new Map();
 
@@ -47,6 +48,7 @@ MMOMParser.prototype._buildParser = function () {
     this._errors = new Map();
     this._index = [];
     this._thread = [];
+    this._initial = [];
     this._rules = new Map();
     this._extractRules();
     this._dirty = false;
@@ -95,6 +97,19 @@ FactorTree.prototype.toThread = function (depth,cont) {
     }
 
     return cont;
+};
+
+FactorTree.prototype.initial = function (initials) {
+    var res = new Set();
+    this.terminals.forEach(function (v, k) { res.add(k); });
+    if (this.leaves.length) return null; // epsilon rule
+    for (var i = 0; i < this.nonterminals.length; i++) {
+        if (this.nonterminals[i]) {
+            if (!initials[i]) return null;
+            initials[i].forEach(function (k) { res.add(k); });
+        }
+    }
+    return res;
 };
 
 function FactorThread(depth, statement, limit, permute, type, cases, next0, next1) {
@@ -215,6 +230,7 @@ MMOMParser.prototype._extractRules = function () {
 
     for (var i = 0; i < this._order.length; i++) {
         this._thread[i] = this._index[i].toThread(0, null);
+        this._initial[i] = this._index[i].initial(this._initial); // note that left-recursion is only allowed to things earlier in the order
     }
 };
 
@@ -280,8 +296,9 @@ MMOMParser.prototype._packratStep = function (ctx, type, ix) {
             ip = ip.next0;
         }
         else {
-            var res = this._packratStep(ctx, ip.type, anix);
-            if (res.tree) {
+            var res;
+            if ((!this._initial[ip.type] || this._initial[ip.type].has(ctx.math[anix])) &&
+                    (res = this._packratStep(ctx, ip.type, anix)).tree) {
                 child_buffer[ip.depth] = res.tree;
                 ixes[ip.depth+1] = res.end;
                 ip = ip.next1;
