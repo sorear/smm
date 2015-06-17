@@ -4,7 +4,7 @@ require('../src/Parser');
 var db,vErr;
 
 function src(x) {
-    beforeAll(function () {
+    before(function () {
         db = MMOM.parseSync('afile',x);
     });
 }

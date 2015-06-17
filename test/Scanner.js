@@ -3,7 +3,7 @@ var expect = require('chai').expect;
 var db;
 function src(x) {
     if (typeof x === 'object' && !(x instanceof Map)) { x = new Map(Object.keys(x).map(function (k) { return [k,x[k]]; })); }
-    beforeAll(function () { db = MMOM.parseSync('afile',x); });
+    before(function () { db = MMOM.parseSync('afile',x); });
 }
 function deep(x) { console.log(require('util').inspect(x,{depth:null,colors:true})); }
 function err(db,i) { var e = db.scanner.errors[i]; return e ? [ e.location.source.name, e.location.from, e.category, e.code ] : []; }

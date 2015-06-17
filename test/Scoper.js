@@ -3,7 +3,7 @@ var expect = require('chai').expect;
 require('../src/Scoper.js');
 var db, errlist;
 function src(x) {
-    beforeAll(function () {
+    before(function () {
         db = MMOM.parseSync('afile',x);
         if (db.scanner.errors.length) throw new Error('unexpected scan errors in scoper pass');
         errlist = [];

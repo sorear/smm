@@ -4,7 +4,7 @@ require('../src/Scoper.js');
 require('../src/Verifier.js');
 var db, vErr;
 function src(x) {
-    beforeAll(function () {
+    before(function () {
         db = MMOM.parseSync('afile',x);
         if (db.scanner.errors.length) throw new Error('unexpected scan errors');
         vErr = db.verifier.errors( db.scoper.lookup('test').labelled );
@@ -59,7 +59,7 @@ cases.forEach(function (cc) {
 });
 
 describe('allErrors:', function () {
-    beforeAll(function () { db = MMOM.parseSync('afile','$c x $. 1 $a x $. 2 $p x $= ? $. 3 $p x $= 1 $. 4 $p x $= ? $.'); });
+    before(function () { db = MMOM.parseSync('afile','$c x $. 1 $a x $. 2 $p x $= ? $. 3 $p x $= 1 $. 4 $p x $= ? $.'); });
     it('size', function () { expect(db.verifier.allErrors.size).equal(2); });
     it('has 2', function () { expect(db.verifier.allErrors.get(db.statement(2)).length).equal(1); });
     it('has 4', function () { expect(db.verifier.allErrors.get(db.statement(4)).length).equal(1); });
