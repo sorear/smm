@@ -1,11 +1,5 @@
-if (typeof define !== 'function') { var define = require('amdefine')(module) }
-
 // This module collects information to perform name resolution and (extended) frame construction for statements
-
-define(['./MMOM'], function (MMOM) {
-'use strict';
-
-var EL = MMOM.ErrorLocation;
+import { MMOMDatabase, MMOMError, MMOMStatement, MMOMErrorLocation as EL } from './MMOM';
 
 function MMScoper(db) {
     this.db = db;
@@ -17,36 +11,36 @@ function MMScoper(db) {
     this._dirty = true;
 }
 
-MMOM.Database.registerAnalyzer('scoper', MMScoper);
+MMOMDatabase.registerAnalyzer('scoper', MMScoper);
 
-MMOM.Error.register('scope', 'label-used-twice', 'A label may only be defined once«prev:Previous definition:l»');
-MMOM.Error.register('scope', 'math-then-label', 'A label may not be defined which is the same as a defined math token«prev:Previous definition:l»');
-MMOM.Error.register('scope', 'eap-empty', 'Math string for $e/$a/$p statement may not be empty');
-MMOM.Error.register('scope', 'eap-not-active-sym', 'Symbol referenced in the math string of an $e/$a/$p statement must have an active definition');
-MMOM.Error.register('scope', 'eap-first-not-const', 'First symbol of an $e/$a/$p statement math string must be a constant');
-MMOM.Error.register('scope', 'eap-no-active-float', 'When a variable symbol is referenced in an $e/$a/$p statement math string, there must be an active $f in scope for that variable');
-MMOM.Error.register('scope', 'close-stack-empty', 'There must be an open ${ before it can be closed with $}');
-MMOM.Error.register('scope', 'const-empty', 'A $c statement must declare at least one constant');
-MMOM.Error.register('scope', 'const-not-top-scope', 'A $c statement is only allowed outside all ${ $} scopes');
-MMOM.Error.register('scope', 'label-then-const', 'A math symbol may not be declared when already used as a label«prev:Previous definition:l»');
-MMOM.Error.register('scope', 'math-then-const', 'A math symbol may not be redeclared as a constant«prev:Previous definition:l»');
-MMOM.Error.register('scope', 'var-empty', 'A $v statement must declare at least one variable');
-MMOM.Error.register('scope', 'label-then-var', 'A math symbol may not be declared when already used as a label«prev:Previous definition:l»');
-MMOM.Error.register('scope', 'math-then-var', 'This variable may not be redeclared as it is already active in this scope«prev:Previous definition:l»');
-MMOM.Error.register('scope', 'float-format', 'A $f statement must have exactly two math symbols (a constant and a variable)');
-MMOM.Error.register('scope', 'float-not-active-const', 'The first symbol of an $f statement must be an active constant');
-MMOM.Error.register('scope', 'float-not-active-var', 'The second symbol of an $f statement must be an active variable');
-MMOM.Error.register('scope', 'float-active-float', 'There is already a $f statement active in this scope for this variable, so another may not be declared«prev:Previous definition:l»');
-MMOM.Error.register('scope', 'dv-short', 'A $d constraint must mention at least two variables');
-MMOM.Error.register('scope', 'dv-repeated', 'A $d constraint may not mention the same variable more than once«prev:Previous mention:l»');
-MMOM.Error.register('scope', 'dv-not-active-var', 'Each symbol appearing in a $d statement must name an active variable');
-MMOM.Error.register('scope', 'never-closed', 'A ${ statement must be closed by a later $}');
+MMOMError.register('scope', 'label-used-twice', 'A label may only be defined once«prev:Previous definition:l»');
+MMOMError.register('scope', 'math-then-label', 'A label may not be defined which is the same as a defined math token«prev:Previous definition:l»');
+MMOMError.register('scope', 'eap-empty', 'Math string for $e/$a/$p statement may not be empty');
+MMOMError.register('scope', 'eap-not-active-sym', 'Symbol referenced in the math string of an $e/$a/$p statement must have an active definition');
+MMOMError.register('scope', 'eap-first-not-const', 'First symbol of an $e/$a/$p statement math string must be a constant');
+MMOMError.register('scope', 'eap-no-active-float', 'When a variable symbol is referenced in an $e/$a/$p statement math string, there must be an active $f in scope for that variable');
+MMOMError.register('scope', 'close-stack-empty', 'There must be an open ${ before it can be closed with $}');
+MMOMError.register('scope', 'const-empty', 'A $c statement must declare at least one constant');
+MMOMError.register('scope', 'const-not-top-scope', 'A $c statement is only allowed outside all ${ $} scopes');
+MMOMError.register('scope', 'label-then-const', 'A math symbol may not be declared when already used as a label«prev:Previous definition:l»');
+MMOMError.register('scope', 'math-then-const', 'A math symbol may not be redeclared as a constant«prev:Previous definition:l»');
+MMOMError.register('scope', 'var-empty', 'A $v statement must declare at least one variable');
+MMOMError.register('scope', 'label-then-var', 'A math symbol may not be declared when already used as a label«prev:Previous definition:l»');
+MMOMError.register('scope', 'math-then-var', 'This variable may not be redeclared as it is already active in this scope«prev:Previous definition:l»');
+MMOMError.register('scope', 'float-format', 'A $f statement must have exactly two math symbols (a constant and a variable)');
+MMOMError.register('scope', 'float-not-active-const', 'The first symbol of an $f statement must be an active constant');
+MMOMError.register('scope', 'float-not-active-var', 'The second symbol of an $f statement must be an active variable');
+MMOMError.register('scope', 'float-active-float', 'There is already a $f statement active in this scope for this variable, so another may not be declared«prev:Previous definition:l»');
+MMOMError.register('scope', 'dv-short', 'A $d constraint must mention at least two variables');
+MMOMError.register('scope', 'dv-repeated', 'A $d constraint may not mention the same variable more than once«prev:Previous mention:l»');
+MMOMError.register('scope', 'dv-not-active-var', 'Each symbol appearing in a $d statement must name an active variable');
+MMOMError.register('scope', 'never-closed', 'A ${ statement must be closed by a later $}');
 
 // these are necessarily secondary errors, hence slight weirdness
-MMOM.Error.register('frame-builder', 'empty-math', 'Frame building failed: lacking a math string«ref:Assertion referenced:l»');
-MMOM.Error.register('frame-builder', 'empty-hyp', 'Frame building failed: having a mandatory $e hypothesis with no math string«ref:Assertion referenced:l»«hyp:Bad hypothesis:l»');
-MMOM.Error.register('frame-builder', 'no-float', 'Frame building failed: having a mandatory variable «var:m» while no $f exists for that variable in the database«ref:Assertion referenced:l»');
-MMOM.Error.register('frame-builder', 'inactive-float', 'Frame building failed: having a mandatory variable «var:m» but no $f statements for that are active«ref:Assertion referenced:l»');
+MMOMError.register('frame-builder', 'empty-math', 'Frame building failed: lacking a math string«ref:Assertion referenced:l»');
+MMOMError.register('frame-builder', 'empty-hyp', 'Frame building failed: having a mandatory $e hypothesis with no math string«ref:Assertion referenced:l»«hyp:Bad hypothesis:l»');
+MMOMError.register('frame-builder', 'no-float', 'Frame building failed: having a mandatory variable «var:m» while no $f exists for that variable in the database«ref:Assertion referenced:l»');
+MMOMError.register('frame-builder', 'inactive-float', 'Frame building failed: having a mandatory variable «var:m» but no $f statements for that are active«ref:Assertion referenced:l»');
 
 // track for:
 // math symbols: relevant $c/$v/$f list
@@ -56,15 +50,15 @@ MMOM.Error.register('frame-builder', 'inactive-float', 'Frame building failed: h
 // $f: active range
 // $d: $d chain
 
-var PROVABLE = MMOM.Statement.PROVABLE;
-var AXIOM = MMOM.Statement.AXIOM;
-var OPEN = MMOM.Statement.OPEN;
-var CLOSE = MMOM.Statement.CLOSE;
-var VARIABLE = MMOM.Statement.VARIABLE;
-var CONSTANT = MMOM.Statement.CONSTANT;
-var ESSENTIAL = MMOM.Statement.ESSENTIAL;
-var FLOATING = MMOM.Statement.FLOATING;
-var DISJOINT = MMOM.Statement.DISJOINT;
+var PROVABLE = MMOMStatement.PROVABLE;
+var AXIOM = MMOMStatement.AXIOM;
+var OPEN = MMOMStatement.OPEN;
+var CLOSE = MMOMStatement.CLOSE;
+var VARIABLE = MMOMStatement.VARIABLE;
+var CONSTANT = MMOMStatement.CONSTANT;
+var ESSENTIAL = MMOMStatement.ESSENTIAL;
+var FLOATING = MMOMStatement.FLOATING;
+var DISJOINT = MMOMStatement.DISJOINT;
 
 MMScoper.prototype.addError = function (loc,code,data) {
     var l1 = this._errors.get(loc.statement);
@@ -492,9 +486,7 @@ Object.defineProperty(MMScoper.prototype, 'allErrors', { get: function () {
     return this._errors;
 } });
 MMScoper.prototype.errors = function (stmt) {
-    if (!(stmt instanceof MMOM.Statement) || stmt.database !== this.db) throw new TypeError('bad statement');
+    if (!(stmt instanceof MMOMStatement) || stmt.database !== this.db) throw new TypeError('bad statement');
     if (this._dirty) this._scan();
     return this._errors.get(stmt) || [];
 };
-
-});

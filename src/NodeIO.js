@@ -1,5 +1,5 @@
-var MMOM = require('./MMOM.js');
+import { parseSync } from './MMOM';
 
-exports.parseFileSync = function (name) {
-    return MMOM.parseSync(name, function (f) { return require('fs').readFileSync(f,'utf8'); });
-};
+export function parseFileSync(name) {
+    return parseSync(name, function (f) { return require('fs').readFileSync(f,'utf8'); });
+}

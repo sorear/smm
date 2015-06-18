@@ -1,6 +1,4 @@
-if (typeof define !== 'function') { var define = require('amdefine')(module) }
-define(['BigInt'], function (BigInt) {
-'use strict';
+import BigInt from 'BigInt';
 // Implementation of the persistent string family from Alstrup, Brodal, Rauhe "Dynamic Pattern Matching", section 4 and the appendix
 
 var bn_zero = BigInt.int2bigInt(0,1);
@@ -790,5 +788,4 @@ ABRStringStore.prototype.lengthBig = function (nn) {
 
 ABRStringStore.BigInt = BigInt;
 
-return ABRStringStore;
-});
+export default ABRStringStore;

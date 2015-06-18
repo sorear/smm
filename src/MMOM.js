@@ -1,12 +1,7 @@
-if (typeof define !== 'function') { var define = require('amdefine')(module) }
-
-define([], function () {
-'use strict';
-
 // This data model is fairly similar to that used by METAMATH.C, although we
 // make statement-level comments their own kind of statement.
 
-function MMOMSource(name, string) {
+export function MMOMSource(name, string) {
     this.name = name;
     this.text = string;
     this.failed = false;
@@ -120,7 +115,7 @@ MMOMSource.prototype.tokenEnd = function (pos) {
 };
 
 // TODO: Add a length field and turn the zones into a linked list to support raw-text extraction without a reparse.  Will probably be needed for efficient comment rendering and WRITE SOURCE
-function MMOMStatement() {
+export function MMOMStatement() {
     this.type = MMOMStatement.EOF;
     this._pos = null;
     this.label = null;
@@ -176,7 +171,7 @@ MMOMStatement.prototype._unlazy = function () {
     this._pos = nst._pos;
 };
 
-function MMOMErrorLocation(kind, statement, source, from, to, data) {
+export function MMOMErrorLocation(kind, statement, source, from, to, data) {
     this.kind = kind;
     this.statement = statement;
     this.source = source;
@@ -207,7 +202,7 @@ MMOMErrorLocation.prototype.error = function (category, code, data) {
 };
 
 // statement, span, category are required
-function MMOMError(location, category, code, data) {
+export function MMOMError(location, category, code, data) {
     this.location = location;
     this.category = category;
     this.code = code;
@@ -260,7 +255,7 @@ MMOMError.register('scanner', 'pseudo-keyword', 'This token contains $ but is no
 var S_IDLE=1,S_LABEL=2,S_MATH=3,S_PROOF=4;
 
 // A scan context is a stateless object which survives the scan so as to support later lazy rescans.
-function MMOMScanContext(root, resolver, sync) {
+export function MMOMScanContext(root, resolver, sync) {
     this.sync = sync;
     this.resolver = resolver;
     this.sources = new Map();
@@ -293,7 +288,7 @@ function MMOMZone(db, ctx, source, next, next_continue, included) {
 
 var BAILOUT_ZONE = new MMOMZone(null, new MMOMScanContext(), new MMOMSource(null, null), null, 0, []);
 
-function MMOMScanner(zone) {
+export function MMOMScanner(zone) {
     //Output
     this.statement_start = 0;
     this.statements = [];
@@ -667,7 +662,7 @@ MMOMScanner.prototype.scan = function () {
 
 var KnownAnalyzerKeys = [];
 
-function MMOMDatabase() {
+export function MMOMDatabase() {
     this.statements = null;
     this.scanner = null;
     for (var i = 0; i < KnownAnalyzerKeys.length; i++) {
@@ -688,7 +683,7 @@ MMOMDatabase.registerAnalyzer = function (name, constructor) {
 Object.defineProperty(MMOMDatabase.prototype, 'statementCount', { get: function () { return this.statements.length; } });
 MMOMDatabase.prototype.statement = function (ix) { return this.statements[ix]; };
 
-function parseSync(name, resolver) {
+export function parseSync(name, resolver) {
     if (typeof resolver === 'string') {
         resolver = new Map([[ name, resolver ]]);
     }
@@ -716,7 +711,7 @@ function parseSync(name, resolver) {
     return new MMOMScanner(new MMOMScanContext(name, resolve, true).initialZone(name)).scan();
 };
 
-function parseAsync(name, resolver) {
+export function parseAsync(name, resolver) {
     return new Promise(function (resolve, reject) {
         function retry() {
             if (!scanner) return;
@@ -738,16 +733,6 @@ function parseAsync(name, resolver) {
     });
 }
 
-return {
-    Source: MMOMSource,
-    Error: MMOMError,
-    ErrorLocation: MMOMErrorLocation,
-    Statement: MMOMStatement,
-    Scanner: MMOMScanner,
-    Database: MMOMDatabase,
-    ScanContext: MMOMScanContext,
-    parseSync: parseSync,
-    parseAsync: parseAsync,
-};
-
-});
+export var Statement = MMOMStatement;
+export var Source = MMOMSource;
+export var Database = MMOMDatabase;

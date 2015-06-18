@@ -1,9 +1,6 @@
-if (typeof define !== 'function') { var define = require('amdefine')(module) }
+import { MMOMError } from './MMOM';
 
-define(['./MMOM'], function (MMOM) {
-'use strict';
-
-MMOM.Error.prototype.toConsoleString = function () {
+MMOMError.prototype.toConsoleString = function () {
     var out = '';
 
     function add_marked(source, from, to, level, message) {
@@ -48,5 +45,3 @@ MMOM.Error.prototype.toConsoleString = function () {
 
     return out;
 };
-
-});

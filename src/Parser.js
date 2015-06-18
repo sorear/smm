@@ -1,11 +1,7 @@
-if (typeof define !== 'function') { var define = require('amdefine')(module) }
+import { MMOMDatabase, MMOMErrorLocation as EL, MMOMError, MMOMStatement } from './MMOM';
+import './Scoper';
 
-define(['./MMOM','./Scoper'], function (MMOM) {
-'use strict';
-
-var EL = MMOM.ErrorLocation;
-
-function MMOMParser(db) {
+export default function MMOMParser(db) {
     this._db = db;
     this._dirty = true; // for the parser itself
     this._checkedAll = false;
@@ -21,20 +17,20 @@ function MMOMParser(db) {
     this._roles = new Map().set('|-', 'wff');
 }
 
-MMOM.Database.registerAnalyzer('parser', MMOMParser);
+MMOMDatabase.registerAnalyzer('parser', MMOMParser);
 
-MMOM.Error.register('parser', 'float-not-syntax', 'Type code of $f statement must be a syntactic type code');
-MMOM.Error.register('parser', 'syntax-with-e', 'Axiom with a syntactic type code must not have $e hypotheses«hyp:Hypothesis:l»');
-MMOM.Error.register('parser', 'syntax-with-dv', 'Axiom with a syntactic type code must not have mandatory disjoint variable conditions («left:m», «right:m»)');
-MMOM.Error.register('parser', 'syntax-repeat-var', 'Variable may not be used more than once in a syntactic axiom«prev:Previous use:l»');
-MMOM.Error.register('parser', 'syntax-ref-nonsyntax', 'Syntactic axiom may not reference non-syntactic variables');
-MMOM.Error.register('parser', 'syntax-left-recursive', 'A syntax axiom may only left recurse into rules with tighter type codes');
-MMOM.Error.register('parser', 'essen-syntax', 'A $e hypothesis may not use a syntactic category');
-MMOM.Error.register('parser', 'unconfigured-type', 'Unconfigured type code');
-MMOM.Error.register('parser', 'ambiguous', 'Grammatical ambiguity detected; from here can be parsed «one:s» or «two:s»');
-MMOM.Error.register('parser', 'parse-error', 'Parsing failed here; expected any of: «expect:m»');
-MMOM.Error.register('parser', 'truncated', 'Statement is incomplete; expected any of: «expect:m»');
-MMOM.Error.register('parser', 'trailing-symbols', 'Unexpected symbols after statement');
+MMOMError.register('parser', 'float-not-syntax', 'Type code of $f statement must be a syntactic type code');
+MMOMError.register('parser', 'syntax-with-e', 'Axiom with a syntactic type code must not have $e hypotheses«hyp:Hypothesis:l»');
+MMOMError.register('parser', 'syntax-with-dv', 'Axiom with a syntactic type code must not have mandatory disjoint variable conditions («left:m», «right:m»)');
+MMOMError.register('parser', 'syntax-repeat-var', 'Variable may not be used more than once in a syntactic axiom«prev:Previous use:l»');
+MMOMError.register('parser', 'syntax-ref-nonsyntax', 'Syntactic axiom may not reference non-syntactic variables');
+MMOMError.register('parser', 'syntax-left-recursive', 'A syntax axiom may only left recurse into rules with tighter type codes');
+MMOMError.register('parser', 'essen-syntax', 'A $e hypothesis may not use a syntactic category');
+MMOMError.register('parser', 'unconfigured-type', 'Unconfigured type code');
+MMOMError.register('parser', 'ambiguous', 'Grammatical ambiguity detected; from here can be parsed «one:s» or «two:s»');
+MMOMError.register('parser', 'parse-error', 'Parsing failed here; expected any of: «expect:m»');
+MMOMError.register('parser', 'truncated', 'Statement is incomplete; expected any of: «expect:m»');
+MMOMError.register('parser', 'trailing-symbols', 'Unexpected symbols after statement');
 
 MMOMParser.prototype._addError = function (loc,code,data) {
     var l1 = this._errors.get(loc.statement);
@@ -137,7 +133,7 @@ MMOMParser.prototype._extractRules = function () {
     for (var i = 0; i < this._db.statements.length; i++) {
         var stmt = this._db.statements[i];
 
-        if (stmt.type === MMOM.Statement.FLOATING) {
+        if (stmt.type === MMOMStatement.FLOATING) {
             if (stmt.math.length !== 2) continue;
             var order = this._order.indexOf(stmt.math[0]);
             var bad = false;
@@ -154,7 +150,7 @@ MMOMParser.prototype._extractRules = function () {
             }
             continue;
         }
-        else if (stmt.type !== MMOM.Statement.AXIOM) {
+        else if (stmt.type !== MMOMStatement.AXIOM) {
             continue;
         }
 
@@ -339,12 +335,12 @@ MMOMParser.prototype.parseMathString = function (goal, index, math) {
 };
 
 MMOMParser.prototype._parseCheckStatement = function (stmt) {
-    if (stmt.type !== MMOM.Statement.ESSENTIAL && stmt.type !== MMOM.Statement.PROVABLE && stmt.type !== MMOM.Statement.AXIOM) return;
+    if (stmt.type !== MMOMStatement.ESSENTIAL && stmt.type !== MMOMStatement.PROVABLE && stmt.type !== MMOMStatement.AXIOM) return;
     var role = this._roles.get(stmt.math[0]);
     if (!role) {
         if (stmt.math.length) {
             if (this._order.indexOf(stmt.math[0]) >= 0) {
-                if (stmt.type === MMOM.Statement.ESSENTIAL) {
+                if (stmt.type === MMOMStatement.ESSENTIAL) {
                     this._addError(EL.math(stmt,0),'essen-syntax');
                 }
             }
@@ -384,11 +380,11 @@ MMOMParser.prototype._parseCheckStatement = function (stmt) {
 };
 
 MMOMParser.prototype.parseStatement = function (stmt) {
-    if (!(stmt instanceof MMOM.Statement) || stmt.database !== this._db) throw new TypeError('invalid or defunct statement');
+    if (!(stmt instanceof MMOMStatement) || stmt.database !== this._db) throw new TypeError('invalid or defunct statement');
     var parse = this._parses.get(stmt.index);
     if (parse !== undefined) return parse;
 
-    if (stmt.type !== MMOM.Statement.ESSENTIAL && stmt.type !== MMOM.Statement.PROVABLE && stmt.type !== MMOM.Statement.AXIOM) throw new TypeError('can only get parse for e/a/p');
+    if (stmt.type !== MMOMStatement.ESSENTIAL && stmt.type !== MMOMStatement.PROVABLE && stmt.type !== MMOMStatement.AXIOM) throw new TypeError('can only get parse for e/a/p');
     this._parseCheckStatement(stmt);
     return this._parses.get(stmt.index) || null;
 };
@@ -404,15 +400,12 @@ Object.defineProperty(MMOMParser.prototype, 'allErrors', { get: function () {
     return this._errors;
 } });
 MMOMParser.prototype.errors = function (stmt) {
-    if (!(stmt instanceof MMOM.Statement) || stmt.database !== this._db) throw new TypeError('bad statement');
+    if (!(stmt instanceof MMOMStatement) || stmt.database !== this._db) throw new TypeError('bad statement');
     if (this._dirty) this._buildParser();
-    if (stmt.type === MMOM.Statement.ESSENTIAL || stmt.type === MMOM.Statement.PROVABLE || stmt.type === MMOM.Statement.AXIOM) {
+    if (stmt.type === MMOMStatement.ESSENTIAL || stmt.type === MMOMStatement.PROVABLE || stmt.type === MMOMStatement.AXIOM) {
         if (!this._parses.has(stmt.index)) {
             this._parseCheckStatement(stmt);
         }
     }
     return this._errors.get(stmt) || [];
 };
-
-return MMOMParser;
-});
