@@ -5,10 +5,10 @@ var rl = require('readline').createInterface({
     output: process.stdout,
 });
 
-var MMOM = require('../src/MMOM');
-require('../src/Scoper');
-require('../src/Verifier');
-var ConsoleErrorFormatter = require('../src/ConsoleErrorFormatter');
+var MMOM = require('../lib/MMOM');
+require('../lib/Scoper');
+require('../lib/Verifier');
+var ConsoleErrorFormatter = require('../lib/ConsoleErrorFormatter');
 
 rl.setPrompt('smm> ');
 rl.prompt();

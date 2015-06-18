@@ -1,4 +1,4 @@
-var ABRStringStore = require('../src/ABRStringStore.js');
+var ABRStringStore = require('../lib/ABRStringStore.js');
 var argp = require('argparser').defaults({ rounds: 1, cycles: 1000, seed: 1, limit: 1e3, constants: 5, mix: 0.2, lcp_mix: 0 }).nonvals('audit','baseline','repeat').parse();
 var crypto = require('crypto');
 

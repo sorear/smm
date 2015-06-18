@@ -1,10 +1,10 @@
 var write = function (str) { process.stdout.write(str.toString(), 'utf8'); };
 
-var MMOM = require('../src/MMOM.js');
-require('../src/Scoper.js');
-require('../src/Verifier.js');
-require('../src/Parser.js');
-require('../src/ConsoleErrorFormatter.js');
+var MMOM = require('../lib/MMOM.js');
+require('../lib/Scoper.js');
+require('../lib/Verifier.js');
+require('../lib/Parser.js');
+require('../lib/ConsoleErrorFormatter.js');
 
 function time(why,f) {
     var time_1 = Date.now();

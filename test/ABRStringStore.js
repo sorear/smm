@@ -1,4 +1,4 @@
-var ABRStringStore = require('../src/ABRStringStore.js');
+var ABRStringStore = require('../lib/ABRStringStore.js');
 var expect = require('chai').expect;
 
 describe('The constant-weight iteration', function () {
