@@ -115,16 +115,46 @@ MMOMSource.prototype.tokenEnd = function (pos) {
 };
 
 // TODO: Add a length field and turn the zones into a linked list to support raw-text extraction without a reparse.  Will probably be needed for efficient comment rendering and WRITE SOURCE
-export function MMOMStatement() {
-    this.type = MMOMStatement.EOF;
-    this._pos = null;
-    this.label = null;
-    this.math = null;
-    this.proof = null;
-    this.reparse_zone = null;
-    this.reparse_index = 0;
-    this.length = 0;
-    this.index = 0;
+export class MMOMStatement {
+    constructor() {
+        this.type = MMOMStatement.EOF;
+        this._pos = null;
+        this.label = null;
+        this.math = null;
+        this.proof = null;
+        this.reparse_zone = null;
+        this.reparse_index = 0;
+        this.length = 0;
+        this.index = 0;
+    }
+
+    get raw() {
+        var out = '', spans = this.spans;
+        for (var i = 0; i < spans.length; i += 3) {
+            out += spans[i].text.substr(spans[i+1],spans[i+2]);
+        }
+        return out;
+    }
+
+    get mathPos() { if (!this._pos) this._unlazy(); return this._pos.mathPos; }
+    get proofPos() { if (!this._pos) this._unlazy(); return this._pos.proofPos; }
+    get startPos() { if (!this._pos) this._unlazy(); return this._pos.startPos; }
+    get spans() { if (!this._pos) this._unlazy(); return this._pos.spans; }
+    get database() {
+        return this.index >= 0 ? this.reparse_zone.database : null;
+    }
+
+    _unlazy() {
+        var scanner = new MMOMScanner(this.reparse_zone);
+        scanner.lazyPositions = false;
+        scanner.reparsing = true;
+        scanner.index = scanner.statement_start = this.reparse_index;
+        scanner.statement._pos = { startPos: null, mathPos: null, proofPos: null, spans: [] };
+
+        var nst = scanner.scan();
+        if (!nst) throw "can't happen - sources unavailable in reparse";
+        this._pos = nst._pos;
+    }
 }
 
 MMOMStatement.EOF = 1;
@@ -141,94 +171,66 @@ MMOMStatement.ESSENTIAL = 11;
 MMOMStatement.FLOATING = 12;
 MMOMStatement.INCLUDE = 13;
 
-Object.defineProperty(MMOMStatement.prototype, 'raw', {
-    get: function () {
-        var out = '', spans = this.spans;
-        for (var i = 0; i < spans.length; i += 3) {
-            out += spans[i].text.substr(spans[i+1],spans[i+2]);
+export class MMOMErrorLocation {
+    constructor(kind, statement, source, from, to, data) {
+        this.kind = kind;
+        this.statement = statement;
+        this.source = source;
+        this.from = from;
+        this.to = to;
+        this.data = data;
+    }
+
+    static scanToken(statement, source, pos) {
+        return new MMOMErrorLocation('scan-token', statement, source, pos, source.tokenEnd(pos), null);
+    }
+
+    static _functional(statement, kind, ary, ix) {
+        if (ix >= ary.length) {
+            ary = statement.startPos;
+            ix = 0;
         }
-        return out;
+        return new MMOMErrorLocation(kind, statement, ary[ix], ary[ix+1], ary[ix].tokenEnd(ary[ix+1]), null);
     }
-});
-Object.defineProperty(MMOMStatement.prototype, 'mathPos', { get: function () { if (!this._pos) this._unlazy(); return this._pos.mathPos; } });
-Object.defineProperty(MMOMStatement.prototype, 'proofPos', { get: function () { if (!this._pos) this._unlazy(); return this._pos.proofPos; } });
-Object.defineProperty(MMOMStatement.prototype, 'startPos', { get: function () { if (!this._pos) this._unlazy(); return this._pos.startPos; } });
-Object.defineProperty(MMOMStatement.prototype, 'spans', { get: function () { if (!this._pos) this._unlazy(); return this._pos.spans; } });
 
-Object.defineProperty(MMOMStatement.prototype, 'database', { get: function () {
-    return this.index >= 0 ? this.reparse_zone.database : null;
-} });
+    static statement(statement) { return MMOMErrorLocation._functional(statement, 'statement', statement.startPos, 0); }
+    static label(statement) { return MMOMErrorLocation._functional(statement, 'label', statement.startPos, 0); }
+    static math(statement, ix) { return MMOMErrorLocation._functional(statement, 'math', statement.mathPos, 2*ix); }
+    static proof(statement, ix) { return MMOMErrorLocation._functional(statement, 'proof', statement.proofPos, 2*ix); }
 
-MMOMStatement.prototype._unlazy = function () {
-    var scanner = new MMOMScanner(this.reparse_zone);
-    scanner.lazyPositions = false;
-    scanner.reparsing = true;
-    scanner.index = scanner.statement_start = this.reparse_index;
-    scanner.statement._pos = { startPos: null, mathPos: null, proofPos: null, spans: [] };
-
-    var nst = scanner.scan();
-    if (!nst) throw "can't happen - sources unavailable in reparse";
-    this._pos = nst._pos;
-};
-
-export function MMOMErrorLocation(kind, statement, source, from, to, data) {
-    this.kind = kind;
-    this.statement = statement;
-    this.source = source;
-    this.from = from;
-    this.to = to;
-    this.data = data;
+    error(category, code, data) { return new MMOMError(this, category, code, data); }
 }
-
-MMOMErrorLocation.scanToken = function (statement, source, pos) {
-    return new MMOMErrorLocation('scan-token', statement, source, pos, source.tokenEnd(pos), null);
-};
-
-MMOMErrorLocation._functional = function (statement, kind, ary, ix) {
-    if (ix >= ary.length) {
-        ary = statement.startPos;
-        ix = 0;
-    }
-    return new MMOMErrorLocation(kind, statement, ary[ix], ary[ix+1], ary[ix].tokenEnd(ary[ix+1]), null);
-};
-
-MMOMErrorLocation.statement = function (statement) { return MMOMErrorLocation._functional(statement, 'statement', statement.startPos, 0); }
-MMOMErrorLocation.label = function (statement) { return MMOMErrorLocation._functional(statement, 'label', statement.startPos, 0); }
-MMOMErrorLocation.math = function (statement, ix) { return MMOMErrorLocation._functional(statement, 'math', statement.mathPos, 2*ix); }
-MMOMErrorLocation.proof = function (statement, ix) { return MMOMErrorLocation._functional(statement, 'proof', statement.proofPos, 2*ix); }
-
-MMOMErrorLocation.prototype.error = function (category, code, data) {
-    return new MMOMError(this, category, code, data);
-};
 
 // statement, span, category are required
-export function MMOMError(location, category, code, data) {
-    this.location = location;
-    this.category = category;
-    this.code = code;
-    this.data = data || {};
-    if (!this.definition) throw new Error(`No definition for generated error ${category}/${code}`);
+export class MMOMError {
+    constructor(location, category, code, data) {
+        this.location = location;
+        this.category = category;
+        this.code = code;
+        this.data = data || {};
+        if (!this.definition) throw new Error(`No definition for generated error ${category}/${code}`);
+    }
+
+    toString() {
+        var source = this.location.source;
+        var pos = source.lookupPos(this.location.from);
+        return `${source.name}:${pos[0]}:${pos[1]}:  ${this.code}`; // TODO add human versions, test
+    }
+
+    get definition() {
+        var l1 = MMOMError._registry.get(this.category);
+        return l1 && l1.get(this.code);
+    }
+
+    // subst codes :l location :m math :s statement-label :t text/toString
+    static register(category, code, template, options) {
+        var l1 = MMOMError._registry.get(category);
+        if (!l1) MMOMError._registry.set(category, l1 = new Map);
+        l1.set(code, { template: template, options: options });
+    }
 }
 
-MMOMError.prototype.toString = function() {
-    var source = this.location.source;
-    var pos = source.lookupPos(this.location.from);
-    return `${source.name}:${pos[0]}:${pos[1]}:  ${this.code}`; // TODO add human versions, test
-};
-
 MMOMError._registry = new Map();
-
-Object.defineProperty(MMOMError.prototype, 'definition', { get: function () {
-    var l1 = MMOMError._registry.get(this.category);
-    return l1 && l1.get(this.code);
-} });
-
-// subst codes :l location :m math :s statement-label :t text/toString
-MMOMError.register = function (category, code, template, options) {
-    var l1 = MMOMError._registry.get(category);
-    if (!l1) MMOMError._registry.set(category, l1 = new Map);
-    l1.set(code, { template: template, options: options });
-};
 
 MMOMError.register('scanner', 'bad-character', 'Characters in database may only be printable ASCII characters or the following controls: newline, carriage return, form feed, tab');
 MMOMError.register('scanner', 'failed-to-read', 'Failed to read, reason: «reason:t»');
@@ -255,26 +257,28 @@ MMOMError.register('scanner', 'pseudo-keyword', 'This token contains $ but is no
 var S_IDLE=1,S_LABEL=2,S_MATH=3,S_PROOF=4;
 
 // A scan context is a stateless object which survives the scan so as to support later lazy rescans.
-export function MMOMScanContext(root, resolver, sync) {
-    this.sync = sync;
-    this.resolver = resolver;
-    this.sources = new Map();
-}
-
-MMOMScanContext.prototype.getSource = function (name) {
-    var src = this.sources.get(name);
-    if (!src) {
-        src = new MMOMSource(name, null);
-        this.resolver(src);
-        if (this.sync && src.text === null) throw 'Resolver failed to synchronously return text in parseSync context';
-        this.sources.set(name, src);
+export class MMOMScanContext {
+    constructor(root, resolver, sync) {
+        this.sync = sync;
+        this.resolver = resolver;
+        this.sources = new Map();
     }
-    return src;
-};
 
-MMOMScanContext.prototype.initialZone = function (name) {
-    return new MMOMZone(new MMOMDatabase(), this, this.getSource(name), null, 0, [name]);
-};
+    getSource(name) {
+        var src = this.sources.get(name);
+        if (!src) {
+            src = new MMOMSource(name, null);
+            this.resolver(src);
+            if (this.sync && src.text === null) throw new Error('Resolver failed to synchronously return text in parseSync context');
+            this.sources.set(name, src);
+        }
+        return src;
+    }
+
+    initialZone(name) {
+        return new MMOMZone(new MMOMDatabase(), this, this.getSource(name), null, 0, [name]);
+    }
+}
 
 // A zone stores the set of included files and the include stack.  A source position can always be identified by a zone and an offset.
 function MMOMZone(db, ctx, source, next, next_continue, included) {
