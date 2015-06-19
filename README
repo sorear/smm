@@ -1,8 +1,9 @@
-This is smm, a library to read and manipulate .mm files used by the Metamath
-System (http://us.metamath.org/).  It is written in Javascript, making fairly
-important use of the ES6 Map and Set objects and much less important use of
-several other ES6 features; currently only io.js 2 and d8 4.5 are known to
-work.  It is distributed under the MIT license (LICENSE).
+This is smm (aka smetamath), a library to read and manipulate .mm files used by
+the Metamath System (http://us.metamath.org/).  It is written in Javascript
+(ES6 using Babel), and is known to work with io.js (recommended) 2.2.1 and
+2.0.1, as well as node.js 0.8.28 and 0.10.38.  node.js 0.12.4 displays a
+strange test failure, I'd avoid it for smm.  It is distributed under the MIT
+license (LICENSE).
 
 To install prerequisites and use smm to verify a set.mm file:
 
@@ -11,11 +12,37 @@ shell rcfile, and only works with Bourneish shells on Unix; if not Unix, skip
 this step)
 
 2. Install io.js 2+ and npm via "nvm install iojs" (Unix); (There is an
-official io.js installer for Windows.  I have not tested this route.)
+official io.js installer for Windows.  This worked with the pre-Babel version
+and may still work.)
 
 3. Download dependencies with "npm install" with the current directory as the
-smm checkout
+smm checkout.
 
-4. Run self-tests: node node_modules/.bin/jasmine
+4. Run self-tests: npm test
 
-5. Use it: node misc/verify.js ../set.mm
+5. Make node-babel available: npm install -g babel
+
+6. Use it: node-babel misc/verify.js ../set.mm
+
+7. Ahead of time testing (somewhat faster, use this for benchmarks):
+
+$$$ mkdir out
+$$$ babel lib -d out/lib
+lib/ABRStringStore.js -> out/lib/ABRStringStore.js
+lib/ConsoleErrorFormatter.js -> out/lib/ConsoleErrorFormatter.js
+lib/MMOM.js -> out/lib/MMOM.js
+lib/NodeIO.js -> out/lib/NodeIO.js
+lib/Parser.js -> out/lib/Parser.js
+lib/Scoper.js -> out/lib/Scoper.js
+lib/Verifier.js -> out/lib/Verifier.js
+$$$ babel misc -d out/misc
+misc/abr_stress.js -> out/misc/abr_stress.js
+misc/gen_expon.js -> out/misc/gen_expon.js
+misc/line_stress.js -> out/misc/line_stress.js
+misc/repl.js -> out/misc/repl.js
+misc/verify.js -> out/misc/verify.js
+$$$ node out/misc/verify.js .../set.mm/set.mm
+parse 778 ms
+scope 232 ms
+parser 667 ms
+verify 4422 ms
