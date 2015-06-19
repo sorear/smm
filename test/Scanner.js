@@ -59,6 +59,11 @@ describe('scan two tokens for linking:', function () {
     it('second linked to index', function () { expect(db.statements[1].index).equal(1); });
 });
 
+describe('three tokens, .raw regression:', () => {
+    src('${ ${ ${');
+    it('second .raw does not spill over', () => { expect(db.statements[1].raw).equal(' ${') });
+});
+
 describe('scan ${ token with leading whitespace:', function () {
     src('\n\n${')
     it('has one statement', function () { expect(db.statements.length).equal(1); });
