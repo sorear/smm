@@ -1,13 +1,6 @@
 // This data model is fairly similar to that used by METAMATH.C, although we
 // make statement-level comments their own kind of statement.
 
-export function MMOMSource(name, string) {
-    this.name = name;
-    this.text = string;
-    this.failed = false;
-    this.eolMaps = null;
-}
-
 // hot inner loop, avoid stuff that could deopt
 function eolScan(string, array, sfirst, send, afirst) {
     //console.log('SCAN',string.length,send-sfirst,sfirst,afirst);
@@ -54,65 +47,74 @@ function getEolArray(string) {
     return out;
 }
 
-MMOMSource.prototype.lookupPos = function (pos) {
-    if (!this.eolMaps) this.eolMaps = getEolArray(this.text);
-    var maps = this.eolMaps;
-
-    var skip = 0;
-    var low = 0, high = maps.length - 1;
-
-    while (low !== high) {
-        var mid = (low + high + 1) >> 1; // >low, <=high
-        if (pos >= maps[mid][0]) {
-            while (low < mid) {
-                skip += maps[low++].length;
-            }
-        }
-        else {
-            high = mid-1;
-        }
-    }
-
-    var the_map = maps[low];
-    low = 0; high = the_map.length-1;
-
-    while (low !== high) {
-        var mid = (low + high + 1) >> 1;
-        if (pos >= the_map[mid]) {
-            low = mid;
-        }
-        else {
-            high = mid-1;
-        }
-    }
-
-    return [ low+skip+1, pos-the_map[low]+1 ]; // "column" will be slightly off in the presence of tabs (evil) and supplementary characters (I care, but not much)
-};
-
-MMOMSource.prototype.getLine = function (lnum) {
-    if (!this.eolMaps) this.eolMaps = getEolArray(this.text);
-    var maps = this.eolMaps;
-    lnum--;
-    if (lnum < 0) return "";
-    var i = 0;
-    // could use binary search, but this array has O(1) bounded size
-    while (i < maps.length && lnum >= maps[i].length) {
-        lnum -= maps[i].length;
-        i++;
-    }
-
-    if (i === maps.length) return "";
-    return this.text.substring(maps[i][lnum], (lnum + 1 === maps[i].length) ? (i+1 === maps.length ? this.text.length : maps[i+1][0]) : maps[i][lnum+1]);
-};
-
 var SP = []; while (SP.length < 33) SP.push(false); SP[32] = SP[9] = SP[13] = SP[12] = SP[10] = true;
 
-// keep this in sync with MMOMScanner.getToken
-MMOMSource.prototype.tokenEnd = function (pos) {
-    var ch;
-    while (pos < this.text.length && ((ch = this.text.charCodeAt(pos)) > 32 || !SP[ch])) pos++;
-    return pos;
-};
+export class MMOMSource {
+    constructor(name, string) {
+        this.name = name;
+        this.text = string;
+        this.failed = false;
+        this.eolMaps = null;
+    }
+
+    lookupPos(pos) {
+        if (!this.eolMaps) this.eolMaps = getEolArray(this.text);
+        var maps = this.eolMaps;
+
+        var skip = 0;
+        var low = 0, high = maps.length - 1;
+
+        while (low !== high) {
+            var mid = (low + high + 1) >> 1; // >low, <=high
+            if (pos >= maps[mid][0]) {
+                while (low < mid) {
+                    skip += maps[low++].length;
+                }
+            }
+            else {
+                high = mid-1;
+            }
+        }
+
+        var the_map = maps[low];
+        low = 0; high = the_map.length-1;
+
+        while (low !== high) {
+            var mid = (low + high + 1) >> 1;
+            if (pos >= the_map[mid]) {
+                low = mid;
+            }
+            else {
+                high = mid-1;
+            }
+        }
+
+        return [ low+skip+1, pos-the_map[low]+1 ]; // "column" will be slightly off in the presence of tabs (evil) and supplementary characters (I care, but not much)
+    }
+
+    getLine(lnum) {
+        if (!this.eolMaps) this.eolMaps = getEolArray(this.text);
+        var maps = this.eolMaps;
+        lnum--;
+        if (lnum < 0) return "";
+        var i = 0;
+        // could use binary search, but this array has O(1) bounded size
+        while (i < maps.length && lnum >= maps[i].length) {
+            lnum -= maps[i].length;
+            i++;
+        }
+
+        if (i === maps.length) return "";
+        return this.text.substring(maps[i][lnum], (lnum + 1 === maps[i].length) ? (i+1 === maps.length ? this.text.length : maps[i+1][0]) : maps[i][lnum+1]);
+    }
+
+    // keep this in sync with MMOMScanner.getToken
+    tokenEnd(pos) {
+        var ch;
+        while (pos < this.text.length && ((ch = this.text.charCodeAt(pos)) > 32 || !SP[ch])) pos++;
+        return pos;
+    }
+}
 
 // TODO: Add a length field and turn the zones into a linked list to support raw-text extraction without a reparse.  Will probably be needed for efficient comment rendering and WRITE SOURCE
 export class MMOMStatement {
@@ -281,129 +283,18 @@ export class MMOMScanContext {
 }
 
 // A zone stores the set of included files and the include stack.  A source position can always be identified by a zone and an offset.
-function MMOMZone(db, ctx, source, next, next_continue, included) {
-    this.database = db;
-    this.ctx = ctx;
-    this.source = source;
-    this.next = next;
-    this.next_continue = next_continue;
-    this.included = included;
+class MMOMZone {
+    constructor(db, ctx, source, next, next_continue, included) {
+        this.database = db;
+        this.ctx = ctx;
+        this.source = source;
+        this.next = next;
+        this.next_continue = next_continue;
+        this.included = included;
+    }
 }
 
 var BAILOUT_ZONE = new MMOMZone(null, new MMOMScanContext(), new MMOMSource(null, null), null, 0, []);
-
-export function MMOMScanner(zone) {
-    //Output
-    this.statement_start = 0;
-    this.statements = [];
-    this.db = zone.database;
-    this.errors = [];
-    this.typesetting_comment = null;
-
-    //State machine
-    //Define a quiescent state as where IDLE, !comment, !directive, at the top of the loop in scan()
-    //Then include_file/token_start/lt_index/lt_zone are dead, statement can be considered fresh
-    this.state = S_IDLE;
-    this.comment_state = false;
-    this.directive_state = false;
-    this.include_file = null;
-    this.statement = new MMOMStatement();
-    this.token_start = 0;
-    this.token_special = false;
-    this.statement.reparse_zone = zone;
-    this.statement.reparse_index = 0;
-
-    //Input
-    this.zone = zone;
-    this.source = zone.source;
-    this.index = 0;
-
-    this.reparsing = false;
-    this.lazyPositions = true;
-    //if (!this.lazyPositions) this.statement._pos = { startPos: null, mathPos: [], proofPos: [], spans: [] };
-}
-
-MMOMScanner.prototype.addError = function (code, data) {
-    this.errors.push(MMOMErrorLocation.scanToken(this.statement, this.source, this.token_start).error('scanner', code, data));
-};
-
-MMOMScanner.prototype.getToken = function () {
-    var ix = this.index, str = this.source.text;
-    // source not yet loaded
-    if (str === null) {
-        return null;
-    }
-    var len = str.length, start, chr;
-
-    while (ix < len && (chr = str.charCodeAt(ix)) <= 32 && SP[chr]) ix++;
-    this.token_start = start = ix;
-    this.token_special = false;
-    while (ix < len && ((chr = str.charCodeAt(ix)) > 32 || !SP[chr])) {
-        if (chr < 32 || chr > 126) {
-            this.addError('bad-character');
-            // skip this token entirely...
-            ix++;
-            while (ix < len && !SP[str.charCodeAt(ix)]) ix++;
-            while (ix < len && SP[str.charCodeAt(ix)]) ix++;
-            this.token_start = start = ix;
-            this.token_special = false;
-            continue;
-        }
-        else if (chr === 0x24) {
-            this.token_special = true;
-        }
-        ix++;
-    }
-
-    this.index = ix;
-
-    if (start === ix) {
-        // getToken should return '' exactly once before the zone is switched out, hence falls through below
-        if (this.source.failed)
-            this.addError('failed-to-read', { reason: this.source.failed });
-        this.token_special = true;
-        return '';
-    }
-
-    return str.substring(start, ix);
-};
-
-// You may only call this after comment_state and directive_state have both cleared.  also the current source must be loaded
-MMOMScanner.prototype.setPosition = function (zone, index) {
-    var statement_start = this.statement_start;
-    if (this.index !== statement_start) {
-        if (this.statement._pos) this.statement._pos.spans.push(this.source, statement_start, this.index);
-        this.statement.length += (this.index - statement_start);
-    }
-
-    this.zone = zone;
-    this.source = zone.source;
-    this.index = index;
-    this.statement_start = index;
-};
-
-// We need to be able to reconstruct a statement by restarting parsing with the specified zone and index and a clean statement.  This is trivial for the first statement but for others the loss of parser state is an issue
-// We guarantee below that newSegment is only ever called with comment_state=false, directive_state=false (implying include_file is dead).
-// Most of the time, we call newSegment immediately before restarting the main loop with state=S_IDLE, so restarting from the current zone/index is correct (token_start is dead as it will be immediately clobbered by getToken, lt_* are not used in S_IDLE)
-// When a statement-starting keyword is seen with an active statement, we need to logically start a new statement *before* the just-read token so that the keyword will be correctly seen on reparse.
-MMOMScanner.prototype.newSegment = function (lt_index) {
-    if (lt_index !== this.statement_start) {
-        if (this.statement._pos) this.statement._pos.spans.push(this.source, this.statement_start, lt_index);
-        this.statement.length += (lt_index - this.statement_start);
-    }
-    this.statement.index = this.statements.length;
-    this.statements.push(this.statement);
-    this.statement_start = lt_index;
-    this.statement = new MMOMStatement();
-    this.statement.reparse_zone = this.zone;
-    this.statement.reparse_index = lt_index;
-    if (this.reparsing) {
-        this.zone = BAILOUT_ZONE;
-        this.source = this.zone.source;
-    }
-    if (!this.lazyPositions) this.statement._pos = { startPos: null, mathPos: null, proofPos: null, spans: [] };
-    return this.statement;
-};
 
 var KW_DATA = {
     '$a': { type: MMOMStatement.AXIOM,     label: true,  atomic: false },
@@ -418,274 +309,391 @@ var KW_DATA = {
     '':   { type: MMOMStatement.EOF,       label: false, atomic: true },
 };
 
-MMOMScanner.prototype.scan = function () {
-    var comment_state = this.comment_state;
-    var directive_state = this.directive_state;
-    var state = this.state;
-    var token, lt_index, kwdata;
-    var posit = !this.lazyPositions;
+export class MMOMScanner {
+    constructor(zone) {
+        //Output
+        this.statement_start = 0;
+        this.statements = [];
+        this.db = zone.database;
+        this.errors = [];
+        this.typesetting_comment = null;
 
-    // note: this version of the loop tokenizes everything, even comments and proofs, which is somewhat wasteful
-    while (true) {
-        lt_index = this.index;
-        token = this.getToken();
+        //State machine
+        //Define a quiescent state as where IDLE, !comment, !directive, at the top of the loop in scan()
+        //Then include_file/token_start/lt_index/lt_zone are dead, statement can be considered fresh
+        this.state = S_IDLE;
+        this.comment_state = false;
+        this.directive_state = false;
+        this.include_file = null;
+        this.statement = new MMOMStatement();
+        this.token_start = 0;
+        this.token_special = false;
+        this.statement.reparse_zone = zone;
+        this.statement.reparse_index = 0;
 
-        if (token === null) {
-            if (this.zone === BAILOUT_ZONE && this.reparsing) {
-                return this.statements[0];
+        //Input
+        this.zone = zone;
+        this.source = zone.source;
+        this.index = 0;
+
+        this.reparsing = false;
+        this.lazyPositions = true;
+        //if (!this.lazyPositions) this.statement._pos = { startPos: null, mathPos: [], proofPos: [], spans: [] };
+    }
+
+    addError(code, data) {
+        this.errors.push(MMOMErrorLocation.scanToken(this.statement, this.source, this.token_start).error('scanner', code, data));
+    }
+
+    getToken() {
+        var ix = this.index, str = this.source.text;
+        // source not yet loaded
+        if (str === null) {
+            return null;
+        }
+        var len = str.length, start, chr;
+
+        while (ix < len && (chr = str.charCodeAt(ix)) <= 32 && SP[chr]) ix++;
+        this.token_start = start = ix;
+        this.token_special = false;
+        while (ix < len && ((chr = str.charCodeAt(ix)) > 32 || !SP[chr])) {
+            if (chr < 32 || chr > 126) {
+                this.addError('bad-character');
+                // skip this token entirely...
+                ix++;
+                while (ix < len && !SP[str.charCodeAt(ix)]) ix++;
+                while (ix < len && SP[str.charCodeAt(ix)]) ix++;
+                this.token_start = start = ix;
+                this.token_special = false;
+                continue;
             }
-            this.comment_state = comment_state;
-            this.state = state;
-            this.directive_state = directive_state;
-            return false;
+            else if (chr === 0x24) {
+                this.token_special = true;
+            }
+            ix++;
         }
 
-        if (comment_state) {
-            if (!this.token_special) continue;
-            switch (token) {
-                case '$)':
-                    comment_state = false;
+        this.index = ix;
+
+        if (start === ix) {
+            // getToken should return '' exactly once before the zone is switched out, hence falls through below
+            if (this.source.failed)
+                this.addError('failed-to-read', { reason: this.source.failed });
+            this.token_special = true;
+            return '';
+        }
+
+        return str.substring(start, ix);
+    }
+
+    // You may only call this after comment_state and directive_state have both cleared.  also the current source must be loaded
+    setPosition(zone, index) {
+        var statement_start = this.statement_start;
+        if (this.index !== statement_start) {
+            if (this.statement._pos) this.statement._pos.spans.push(this.source, statement_start, this.index);
+            this.statement.length += (this.index - statement_start);
+        }
+
+        this.zone = zone;
+        this.source = zone.source;
+        this.index = index;
+        this.statement_start = index;
+    }
+
+    // We need to be able to reconstruct a statement by restarting parsing with the specified zone and index and a clean statement.  This is trivial for the first statement but for others the loss of parser state is an issue
+    // We guarantee below that newSegment is only ever called with comment_state=false, directive_state=false (implying include_file is dead).
+    // Most of the time, we call newSegment immediately before restarting the main loop with state=S_IDLE, so restarting from the current zone/index is correct (token_start is dead as it will be immediately clobbered by getToken, lt_* are not used in S_IDLE)
+    // When a statement-starting keyword is seen with an active statement, we need to logically start a new statement *before* the just-read token so that the keyword will be correctly seen on reparse.
+    newSegment(lt_index) {
+        if (lt_index !== this.statement_start) {
+            if (this.statement._pos) this.statement._pos.spans.push(this.source, this.statement_start, lt_index);
+            this.statement.length += (lt_index - this.statement_start);
+        }
+        this.statement.index = this.statements.length;
+        this.statements.push(this.statement);
+        this.statement_start = lt_index;
+        this.statement = new MMOMStatement();
+        this.statement.reparse_zone = this.zone;
+        this.statement.reparse_index = lt_index;
+        if (this.reparsing) {
+            this.zone = BAILOUT_ZONE;
+            this.source = this.zone.source;
+        }
+        if (!this.lazyPositions) this.statement._pos = { startPos: null, mathPos: null, proofPos: null, spans: [] };
+        return this.statement;
+    }
+
+    scan() {
+        var comment_state = this.comment_state;
+        var directive_state = this.directive_state;
+        var state = this.state;
+        var token, lt_index, kwdata;
+        var posit = !this.lazyPositions;
+
+        // note: this version of the loop tokenizes everything, even comments and proofs, which is somewhat wasteful
+        while (true) {
+            lt_index = this.index;
+            token = this.getToken();
+
+            if (token === null) {
+                if (this.zone === BAILOUT_ZONE && this.reparsing) {
+                    return this.statements[0];
+                }
+                this.comment_state = comment_state;
+                this.state = state;
+                this.directive_state = directive_state;
+                return false;
+            }
+
+            if (comment_state) {
+                if (!this.token_special) continue;
+                switch (token) {
+                    case '$)':
+                        comment_state = false;
+
+                        if (state === S_IDLE) {
+                            this.statement.type = MMOMStatement.COMMENT;
+                            this.newSegment(this.index);
+                        }
+
+                        continue;
+
+                    case '$t':
+                        this.typesetting_comment = this.statement; // since we can very efficiently find this here
+                        continue;
+
+                    case '':
+                        this.addError('eof-in-comment');
+                        comment_state = false;
+                        break; // fall through so that we'll also handle an enclosing comment and end the file
+
+                    default:
+                        if (token.indexOf('$)') >= 0)
+                            this.addError('pseudo-comment-end');
+                        if (token.indexOf('$(') >= 0)
+                            this.addError('pseudo-nested-comment');
+                        continue;
+                }
+            }
+
+            if (directive_state) {
+                if (token === '$]') {
+                    directive_state = false;
+                    if (this.include_file === null) {
+                        this.addError('missing-filename');
+                        continue;
+                    }
+
+                    // TODO: this requires resolution to deal with path canonicity issues
+                    if (this.zone.included.indexOf(this.include_file) < 0)
+                        this.setPosition( new MMOMZone( this.zone.database, this.zone.ctx, this.zone.ctx.getSource(this.include_file), this.zone, this.index, this.zone.included.concat(this.include_file) ), 0 );
 
                     if (state === S_IDLE) {
-                        this.statement.type = MMOMStatement.COMMENT;
+                        this.statement.type = MMOMStatement.INCLUDE;
                         this.newSegment(this.index);
                     }
 
                     continue;
-
-                case '$t':
-                    this.typesetting_comment = this.statement; // since we can very efficiently find this here
-                    continue;
-
-                case '':
-                    this.addError('eof-in-comment');
-                    comment_state = false;
-                    break; // fall through so that we'll also handle an enclosing comment and end the file
-
-                default:
-                    if (token.indexOf('$)') >= 0)
-                        this.addError('pseudo-comment-end');
-                    if (token.indexOf('$(') >= 0)
-                        this.addError('pseudo-nested-comment');
-                    continue;
-            }
-        }
-
-        if (directive_state) {
-            if (token === '$]') {
-                directive_state = false;
-                if (this.include_file === null) {
-                    this.addError('missing-filename');
-                    continue;
                 }
 
-                // TODO: this requires resolution to deal with path canonicity issues
-                if (this.zone.included.indexOf(this.include_file) < 0)
-                    this.setPosition( new MMOMZone( this.zone.database, this.zone.ctx, this.zone.ctx.getSource(this.include_file), this.zone, this.index, this.zone.included.concat(this.include_file) ), 0 );
-
-                if (state === S_IDLE) {
-                    this.statement.type = MMOMStatement.INCLUDE;
-                    this.newSegment(this.index);
+                if (token === '') {
+                    this.addError('unterminated-directive');
+                    directive_state = false;
+                    // fall through to handle end of the current file
                 }
-
-                continue;
-            }
-
-            if (token === '') {
-                this.addError('unterminated-directive');
-                directive_state = false;
-                // fall through to handle end of the current file
-            }
-            else {
-                if (this.include_file !== null) {
-                    this.addError('directive-too-long');
-                    continue;
-                }
-
-                if (this.token_special) {
-                    this.addError('dollar-in-filename');
-                    continue;
-                }
-
-                this.include_file = token;
-                continue;
-            }
-        }
-
-        if (!this.token_special) {
-            switch (state) {
-                case S_IDLE:
-                    if (/[^-_.0-9a-zA-Z]/.test(token))
-                        this.addError('invalid-label'); // currently still allow into DOM
-                    this.statement.label = token;
-                    if (posit) this.statement._pos.startPos = [this.source, this.token_start];
-                    state = S_LABEL;
-                    break;
-                case S_LABEL:
-                    this.addError('duplicate-label');
-                    this.statement.label = token;
-                    break;
-                case S_MATH:
-                    this.statement.math.push(token);
-                    if (posit) this.statement._pos.mathPos.push(this.source, this.token_start);
-                    break;
-                case S_PROOF:
-                    this.statement.proof.push(token);
-                    if (posit) this.statement._pos.proofPos.push(this.source, this.token_start);
-                    break;
-            }
-            continue;
-        }
-
-        switch (token) {
-            case '$(':
-                comment_state = true;
-                break;
-
-            case '$[':
-                directive_state = true;
-                this.include_file = null;
-                break;
-
-            case '$)':
-                this.addError('loose-comment-end');
-                break;
-
-            case '$.':
-                if (state === S_MATH || state === S_PROOF) {
-                    if (this.statement.type === MMOMStatement.PROVABLE && state === S_MATH) {
-                        this.addError('missing-proof');
+                else {
+                    if (this.include_file !== null) {
+                        this.addError('directive-too-long');
+                        continue;
                     }
-                    this.newSegment(this.index);
-                }
-                else {
-                    this.addError('spurious-period'); // IDLE or LABEL
-                    this.statement.type = MMOMStatement.BOGUS;
-                    this.newSegment(this.index);
-                }
-                state = S_IDLE;
-                break;
 
-            case '$=':
-                if (state !== S_MATH || !this.statement.proof) {
-                    this.addError('spurious-proof');
-                    this.statement.type = MMOMStatement.BOGUS;
+                    if (this.token_special) {
+                        this.addError('dollar-in-filename');
+                        continue;
+                    }
+
+                    this.include_file = token;
+                    continue;
                 }
-                else {
-                    state = S_PROOF;
+            }
+
+            if (!this.token_special) {
+                switch (state) {
+                    case S_IDLE:
+                        if (/[^-_.0-9a-zA-Z]/.test(token))
+                            this.addError('invalid-label'); // currently still allow into DOM
+                        this.statement.label = token;
+                        if (posit) this.statement._pos.startPos = [this.source, this.token_start];
+                        state = S_LABEL;
+                        break;
+                    case S_LABEL:
+                        this.addError('duplicate-label');
+                        this.statement.label = token;
+                        break;
+                    case S_MATH:
+                        this.statement.math.push(token);
+                        if (posit) this.statement._pos.mathPos.push(this.source, this.token_start);
+                        break;
+                    case S_PROOF:
+                        this.statement.proof.push(token);
+                        if (posit) this.statement._pos.proofPos.push(this.source, this.token_start);
+                        break;
                 }
-                break;
+                continue;
+            }
 
-            case '$]':
-                this.addError('loose-directive-end');
-                break;
+            switch (token) {
+                case '$(':
+                    comment_state = true;
+                    break;
 
-            case '$a':
-            case '$c':
-            case '$d':
-            case '$e':
-            case '$f':
-            case '$p':
-            case '$v':
-            case '${':
-            case '$}':
-            case '':
-                if (token === '' && this.zone.next) {
-                    // file switch: need not interrupt a statement
+                case '$[':
+                    directive_state = true;
+                    this.include_file = null;
+                    break;
 
-                    // idle state cannot span a file boundary with spans (due to EOF having already been created), so it's unneccessary to check that
-                    if (state === S_IDLE && this.index !== this.statement_start) {
-                        this.statement.type = MMOMStatement.EOF;
-                        this.setPosition(this.zone.next, this.zone.next_continue);
+                case '$)':
+                    this.addError('loose-comment-end');
+                    break;
+
+                case '$.':
+                    if (state === S_MATH || state === S_PROOF) {
+                        if (this.statement.type === MMOMStatement.PROVABLE && state === S_MATH) {
+                            this.addError('missing-proof');
+                        }
                         this.newSegment(this.index);
                     }
                     else {
-                        this.setPosition(this.zone.next, this.zone.next_continue);
+                        this.addError('spurious-period'); // IDLE or LABEL
+                        this.statement.type = MMOMStatement.BOGUS;
+                        this.newSegment(this.index);
                     }
+                    state = S_IDLE;
                     break;
-                }
 
-                // less than ideal because the keyword gets boxed into the last statement.  should ideally back up the previous by a statement or two
-                if (state === S_MATH) {
-                    this.addError('nonterminated-math');
-                    this.newSegment(lt_index);
-                    state = S_IDLE;
-                }
-                else if (state === S_PROOF) {
-                    this.addError('nonterminated-proof');
-                    this.newSegment(lt_index);
-                    state = S_IDLE;
-                }
-
-                kwdata = KW_DATA[token];
-                this.statement.type = kwdata.type
-
-                if (kwdata.label) {
-                    if (state !== S_LABEL) {
-                        this.addError('missing-label');
+                case '$=':
+                    if (state !== S_MATH || !this.statement.proof) {
+                        this.addError('spurious-proof');
                         this.statement.type = MMOMStatement.BOGUS;
                     }
-                }
-                else {
-                    if (state === S_LABEL) this.addError('spurious-label');
-                    this.statement.label = null;
-                    if (posit) this.statement._pos.startPos = [this.source, this.token_start];
-                }
+                    else {
+                        state = S_PROOF;
+                    }
+                    break;
 
-                if (kwdata.atomic) {
-                    if (token === '') {
-                        if (!this.reparsing) {
-                            this.db.statements = this.statements;
-                            this.db.scanner = { errors: this.errors };
+                case '$]':
+                    this.addError('loose-directive-end');
+                    break;
+
+                case '$a':
+                case '$c':
+                case '$d':
+                case '$e':
+                case '$f':
+                case '$p':
+                case '$v':
+                case '${':
+                case '$}':
+                case '':
+                    if (token === '' && this.zone.next) {
+                        // file switch: need not interrupt a statement
+
+                        // idle state cannot span a file boundary with spans (due to EOF having already been created), so it's unneccessary to check that
+                        if (state === S_IDLE && this.index !== this.statement_start) {
+                            this.statement.type = MMOMStatement.EOF;
+                            this.setPosition(this.zone.next, this.zone.next_continue);
+                            this.newSegment(this.index);
                         }
-                        if (this.index !== this.statement_start) this.newSegment(this.index);
-                        if (this.reparsing)
-                            return this.statements[0];
-                        return this.db;
+                        else {
+                            this.setPosition(this.zone.next, this.zone.next_continue);
+                        }
+                        break;
                     }
-                    this.newSegment(this.index);
-                    state = S_IDLE;
-                }
-                else {
-                    state = S_MATH;
-                    this.statement.math = [];
-                    if (posit) this.statement._pos.mathPos = [];
-                    if (token === '$p') { // allocate a proof statement even if the statement type was forced to BOGUS due to missing label
-                        if (posit) this.statement._pos.proofPos = [];
-                        this.statement.proof = [];
-                    }
-                }
-                break;
 
-            default:
-                this.addError('pseudo-keyword');
-                break;
+                    // less than ideal because the keyword gets boxed into the last statement.  should ideally back up the previous by a statement or two
+                    if (state === S_MATH) {
+                        this.addError('nonterminated-math');
+                        this.newSegment(lt_index);
+                        state = S_IDLE;
+                    }
+                    else if (state === S_PROOF) {
+                        this.addError('nonterminated-proof');
+                        this.newSegment(lt_index);
+                        state = S_IDLE;
+                    }
+
+                    kwdata = KW_DATA[token];
+                    this.statement.type = kwdata.type
+
+                    if (kwdata.label) {
+                        if (state !== S_LABEL) {
+                            this.addError('missing-label');
+                            this.statement.type = MMOMStatement.BOGUS;
+                        }
+                    }
+                    else {
+                        if (state === S_LABEL) this.addError('spurious-label');
+                        this.statement.label = null;
+                        if (posit) this.statement._pos.startPos = [this.source, this.token_start];
+                    }
+
+                    if (kwdata.atomic) {
+                        if (token === '') {
+                            if (!this.reparsing) {
+                                this.db.statements = this.statements;
+                                this.db.scanner = { errors: this.errors };
+                            }
+                            if (this.index !== this.statement_start) this.newSegment(this.index);
+                            if (this.reparsing)
+                                return this.statements[0];
+                            return this.db;
+                        }
+                        this.newSegment(this.index);
+                        state = S_IDLE;
+                    }
+                    else {
+                        state = S_MATH;
+                        this.statement.math = [];
+                        if (posit) this.statement._pos.mathPos = [];
+                        if (token === '$p') { // allocate a proof statement even if the statement type was forced to BOGUS due to missing label
+                            if (posit) this.statement._pos.proofPos = [];
+                            this.statement.proof = [];
+                        }
+                    }
+                    break;
+
+                default:
+                    this.addError('pseudo-keyword');
+                    break;
+            }
         }
-    }
-};
-
-var KnownAnalyzerKeys = [];
-
-export function MMOMDatabase() {
-    this.statements = null;
-    this.scanner = null;
-    for (var i = 0; i < KnownAnalyzerKeys.length; i++) {
-        this[KnownAnalyzerKeys[i]] = null;
     }
 }
 
-MMOMDatabase.registerAnalyzer = function (name, constructor) {
-    var key = '__' + name;
+var KnownAnalyzerKeys = [];
 
-    KnownAnalyzerKeys.push(key);
+export class MMOMDatabase {
+    constructor() {
+        this.statements = null;
+        this.scanner = null;
+        for (var i = 0; i < KnownAnalyzerKeys.length; i++) {
+            this[KnownAnalyzerKeys[i]] = null;
+        }
+    }
 
-    Object.defineProperty(MMOMDatabase.prototype, name, { get: function () {
-        return this[key] || (this[key] = new constructor(this));
-    } });
-};
+    static registerAnalyzer(name, constructor) {
+        var key = '__' + name;
 
-Object.defineProperty(MMOMDatabase.prototype, 'statementCount', { get: function () { return this.statements.length; } });
-MMOMDatabase.prototype.statement = function (ix) { return this.statements[ix]; };
+        KnownAnalyzerKeys.push(key);
+
+        Object.defineProperty(MMOMDatabase.prototype, name, { get: function () {
+            return this[key] || (this[key] = new constructor(this));
+        } });
+    }
+
+    get statementCount() { return this.statements.length; }
+    statement(ix) { return this.statements[ix]; }
+}
 
 export function parseSync(name, resolver) {
     if (typeof resolver === 'string') {
@@ -737,6 +745,4 @@ export function parseAsync(name, resolver) {
     });
 }
 
-export var Statement = MMOMStatement;
-export var Source = MMOMSource;
-export var Database = MMOMDatabase;
+export { MMOMStatement as Statement, MMOMSource as Source, MMOMDatabase as Database };
