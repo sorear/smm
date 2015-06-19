@@ -187,15 +187,22 @@ describe('nested comment:', function () {
 describe('bad characters in comment:', function () {
     src('$( \u001f \u007f $)')
     errs([
-        ['afile',3,'scanner','bad-character'],
+        ['afile',0,'scanner','bad-character'],
         ['afile',5,'scanner','bad-character'],
     ]);
 });
 
 describe('token with bad characters skipped', function () {
+    src('$c a b\u00ffc d $.')
+    it('statement count', function () { expect(db.statements.length).equal(1); });
+    it('bad token skipped', function () { expect(seg(db,0)).eql([MMOM.Statement.CONSTANT,'$c a b\u00ffc d $.',['a','d'],null]); });
+    errs([ ['afile',5,'scanner','bad-character'] ]);
+});
+
+describe('controls treated as whitespace + error', function () {
     src('$c a b\u001fc d $.')
     it('statement count', function () { expect(db.statements.length).equal(1); });
-    it('bad token skipped', function () { expect(seg(db,0)).eql([MMOM.Statement.CONSTANT,'$c a b\u001fc d $.',['a','d'],null]); });
+    it('bad token skipped', function () { expect(seg(db,0)).eql([MMOM.Statement.CONSTANT,'$c a b\u001fc d $.',['a','b','c','d'],null]); });
     errs([ ['afile',5,'scanner','bad-character'] ]);
 });
 
