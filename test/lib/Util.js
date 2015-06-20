@@ -12,6 +12,7 @@ export function renderErrorLocation(loc, how) {
 
 export function renderError(error, how) {
     let erec = [];
+    if (!error) return [];
     if (how.withStatement) erec.push((error.location && error.location.statement) ? (error.location.statement.label || error.location.statement.index) : null);
     erec.push(renderErrorLocation(error.location, how));
     erec.push(`${error.category}/${error.code}`);
