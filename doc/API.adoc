@@ -1,4 +1,6 @@
 == Stable(r) API
+:source-highlighter: highlightjs
+:source-language: javascript
 
 === General
 
@@ -9,7 +11,7 @@ Individual statements are represented by instances of `MMOM.Statement`.
 A statement is born into a database, and thereafter is not (observably) modified except to remove it.
 Databases are modified by calling methods on the database to insert statements, remove statements, and replace statements with modified versions.
 
-Statements in SMM are the statements defined in the Metamath specification, plus SMM-specific statement types `COMMENT`, `INCLUDE`, `BOGUS`, and `EOF`;
+Statements in SMM are the statements defined in the Metamath specification, plus SMM-specific statement types `COMMENT`, `INCLUDE`, `BOGUS`, `METACOMMENT`, and `EOF`;
 these statement types have no effect on the mathematical content of the database, but serve to hold text during parsing that does not naturally correspond to any statement.
 SMM always knows the character data corresponding to a statement.
 It is impossible to create a statement without making *some* decision about the whitespace that would be used to write that statement to a file.
@@ -22,25 +24,31 @@ Since modifying prototypes after optimized code generation is problematic, try t
 
 === Parsing
 
-    database = MMOM.parseSync('filename', '$( file content $)')
+[source]
+import { parseSync } from 'smm/MMOM';
+database = parseSync('filename', '$( file content $)');
 
 Call `parseSync` with two strings to parse a database which is already loaded as a string.
 Returns a `MMOM.Database` instance.
 The filename will be used for error messages (also, `$[` will ignore that filename but give errors for all others).
 Never throws, returns errors in the database object.
 
-    database = MMOM.parseSync('file1',
-        new Map().set('file1','$[ file2 $]').set('file2',''));
+[source]
+database = parseSync('file1',
+    new Map().set('file1','$[ file2 $]').set('file2',''));
 
 The second argument to `parseSync` may be a `Map` if multiple files are used.
 
-    database = MMOM.parseSync('file1', filename => 'foo');
+[source]
+database = parseSync('file1', filename => 'foo');
 
 The second argument to `parseSync` may be a function, which will be passed a file name and must return a string or throw an exception.
 Exceptions will be wrapped into `failed-to-read` errors.
 
-    MMOM.parseAsync('file1', filename =>
-        fetch(filename).then(rpy => rpy.text())).then(db => ... );
+[source]
+import { parseAsync } from 'smm/MMOM'
+promise = parseAsync('file1', filename =>
+    fetch(filename).then(rpy => rpy.text())).then(db => ... );
 
 `parseAsync` functions like `parseSync` except that only the function form is supported, the function is expected to return a promise, and a promise is returned at the end.
 As `parseSync` never throws, the promise returned from `parseAsync` never rejects.
@@ -51,8 +59,9 @@ However, a database with parsing errors cannot be modified, due to the difficult
 
 === Statements
 
-    count = database.statementCount;
-    statement = database.statement(42);
+[source]
+count = database.statementCount;
+statement = database.statement(42);
 
 A database has a `statementCount` property and a `statement` reader method.
 Currently all database access is mediated by statement indices.
@@ -63,30 +72,34 @@ It is likely that a future version of SMM will use another technique to record s
 Statements are immutable.
 To change a database, splice in new statements; do not attempt to modify existing ones.
 
-    statement.type === MMOM.Statement.OPEN
-    statement.type === MMOM.Statement.CLOSE
-    statement.type === MMOM.Statement.CONSTANT
-    statement.type === MMOM.Statement.VARIABLE
-    statement.type === MMOM.Statement.DISJOINT
-    statement.type === MMOM.Statement.ESSENTIAL
-    statement.type === MMOM.Statement.FLOATING
-    statement.type === MMOM.Statement.AXIOM
-    statement.type === MMOM.Statement.PROVABLE
+[source]
+import { MMOMStatement } from 'smm/MMOM';
+statement.type === MMOMStatement.OPEN;
+statement.type === MMOMStatement.CLOSE;
+statement.type === MMOMStatement.CONSTANT;
+statement.type === MMOMStatement.VARIABLE;
+statement.type === MMOMStatement.DISJOINT;
+statement.type === MMOMStatement.ESSENTIAL;
+statement.type === MMOMStatement.FLOATING;
+statement.type === MMOMStatement.AXIOM;
+statement.type === MMOMStatement.PROVABLE;
 
 Statements have a type property, which is equal to the constants above for real statements.
 Fake statements also have types, but their number and roles are not currently considered stable.
 
-    string = statement.label
-    arrayString = statement.math
-    arrayString = statement.proof
+[source]
+string = statement.label;
+arrayString = statement.math;
+arrayString = statement.proof;
 
 Accessors for the fundamental parts of a statement.
 `math` and `proof` may be `null` on statement types for which they are not applicable;
 when they are applicable, they will always be present even if empty.
 
-    index = statement.index
-    database = statement.database
-    statement === database.statement(index)
+[source]
+index = statement.index;
+database = statement.database;
+statement === database.statement(index);
 
 A statement which is in a database knows its database and index.
 
@@ -94,8 +107,10 @@ A statement which is in a database knows its database and index.
 
 This module calculates scopes and symbol tables.
 
-    let sym = database.scoper.lookup('ruc')
-    database.verifier.errors(sym.labelled)
+[source]
+import 'smm/Scoper';
+let sym = database.scoper.lookup('ruc');
+database.verifier.errors(sym.labelled);
 
 Symbol table entries are returned as objects with slots for different types of usage of symbols.
 Currently only labelled (find the statement with this label) has API status.
@@ -105,25 +120,39 @@ Currently only labelled (find the statement with this label) has API status.
 This is the standard-mode verifier; it does not exploit statement parsing (that works only for set.mm).
 It implements the common error checking protocol but has no other API.
 
+=== Metadata
+
+Metadata from the $t comment can be accessed using the metadata analyzer.
+
+[source]
+import 'smm/Metadata';
+title = database.metadata.param('htmltitle');
+andsign = database.metadata.tokenDef('htmldef', '/\\');
+
+Both methods return `null` if not defined.
+
 === Errors
 
-....
-import 'Scoper'
-array_of_errors = database.scoper.errors(statement)
-map_of_errors = database.scoper.allErrors
+[source]
+----
+import 'smm/Scoper';
+array_of_errors = database.scoper.errors(statement);
+map_of_errors = database.scoper.allErrors;
 
-import 'Verifier'
-array_of_errors = database.verifier.errors(statement)
-map_of_errors = database.verifier.allErrors
-....
+import 'smm/Verifier';
+array_of_errors = database.verifier.errors(statement);
+map_of_errors = database.verifier.allErrors;
+----
 
 Several analyzers have the capability to generate warnings or errors while analyzing the database.
 These analyzers implement a common API: `errors` fetches a list of errors for a specific statement, `allErrors` fetches a map with error data for each statement with at least one error.
 
-    array_of_errors = database.scanner.errors
+[source]
+array_of_errors = database.scanner.errors;
 
 Scanner errors are reported differently because they cannot generally be linked to a statement.
 
-    process.stdout.write( error.toConsoleString(), 'utf8' );
+[source]
+process.stdout.write( error.toConsoleString(), 'utf8' );
 
 Renders an error as a string containing newlines for human consumption.
