@@ -421,6 +421,22 @@ var cases = [
         ],
         err: [['afile',4,'scanner','duplicate-label']],
     },
+    {
+        tag: 'meta comment',
+        src: '$( $t x $)',
+        seg: [
+            { typ: 'METACOMMENT', raw: '$( $t x $)', mat: null, lbl: null, prf: null },
+        ],
+        err: [],
+    },
+    {
+        tag: 'embed meta comment',
+        src: '$c $( $t x $) $.',
+        seg: [
+            { typ: 'CONSTANT', raw: '$c $( $t x $) $.', mat: [], lbl: null, prf: null },
+        ],
+        err: [['afile',6,'scanner','embedded-meta']],
+    },
 ];
 
 cases.forEach(function(c) {
