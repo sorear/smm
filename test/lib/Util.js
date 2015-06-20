@@ -36,6 +36,15 @@ export function describeDB(name, src, callback, how = {}) {
     });
 }
 
+export function flattenErrorMap(map) {
+    let keys = [];
+    map.forEach((list, key) => keys.push(key));
+    let out = [];
+    keys.sort((a,b) => a.index - b.index).forEach(key =>
+            map.get(key).forEach(err => out.push(err)));
+    return out;
+}
+
 export function testErrorList(label, thunk, list, how = {}) {
     list.forEach((errorDesc, index) => {
         it(`${label} error#${index}: ${errorDesc[1]}`, function () { expect(renderError(thunk()[index], how)).to.eql(errorDesc); });
@@ -44,6 +53,11 @@ export function testErrorList(label, thunk, list, how = {}) {
 }
 
 export function testErrorMap(dbThunk, mapThunk, obj, how = {}) {
+    if (how.flat) {
+        testErrorList('', () => flattenErrorMap(mapThunk()), obj, how);
+        return;
+    }
+
     Object.keys(obj).forEach(label => {
         testErrorList(
             label,
