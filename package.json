@@ -4,7 +4,7 @@
   "description": "sorear metamath toolkit",
   "main": "index.js",
   "scripts": {
-    "test": "?"
+    "test": "mocha --compilers js:babel/register"
   },
   "repository": {
     "type": "git",
@@ -25,12 +25,9 @@
     "chai": "^3.0.0",
     "mocha": "^2.2.5"
   },
-  "scripts": {
-    "test": "mocha --compilers js:babel/register"
-  },
   "dependencies": {
     "BigInt": "^5.5.3",
-    "argparser": "^0.2.2",
+    "dashdash": "^1.10.0",
     "fs-promise": "^0.3.1"
   }
 }

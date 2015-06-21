@@ -1,5 +1,17 @@
 var ABRStringStore = require('../lib/ABRStringStore.js');
-var argp = require('argparser').defaults({ rounds: 1, cycles: 1000, seed: 1, limit: 1e3, constants: 5, mix: 0.2, lcp_mix: 0 }).nonvals('audit','baseline','repeat').parse();
+var pars = require('dashdash').createParser({ options: [
+    { name: 'rounds',    default: 1,    type: 'positiveInteger', help: 'Number of times to run the test (resetting store between)' },
+    { name: 'cycles',    default: 1000, type: 'positiveInteger', help: 'Number of operations to run in each test' },
+    { name: 'seed',      default: 1,    type: 'positiveInteger', help: 'Random seed for the first test' },
+    { name: 'limit',     default: 1000, type: 'positiveInteger', help: 'Maximum length of strings to generate in each test' },
+    { name: 'constants', default: 5,    type: 'positiveInteger', help: 'Number of constants to create in each test' },
+    { name: 'mix',       default: 0.2,  type: 'number',          help: 'Fraction of split operations to perform' },
+    { name: 'lcp-mix',   default: 0,    type: 'number',          help: 'Fraction of longest-common-prefix operations to perform' },
+    { name: 'audit',                    type: 'bool',            help: 'Check for tree canonicity after each operation' },
+    { name: 'baseline',                 type: 'bool',            help: 'Use native strings instead of ABR' },
+    { name: 'repeat',                   type: 'bool',            help: 'Use same seed for each cycle (default: increment)' },
+] });
+try { var argp = pars.parse(); } catch(e) { console.log(e.message); console.log(pars.help()); process.exit(1); }
 var crypto = require('crypto');
 
 function srand(seed) {
@@ -26,25 +38,25 @@ BaselineStore.prototype.split = function (x,i) { return [x.substr(0,i*2),x.subst
 BaselineStore.prototype.singleton = function (x) { return x < 10 ? '0'+x : ''+x; };
 BaselineStore.prototype.length = function (x) { return x.length / 2 };
 
-var seed = argp.opt('seed');
-var nrounds = argp.opt('rounds');
-var cycles = argp.opt('cycles');
-var limit = argp.opt('limit');
-var audit = argp.opt('audit');
-var baseline = argp.opt('baseline');
-var mix = argp.opt('mix');
-var lcp_mix = argp.opt('lcp_mix');
+var seed = argp.seed;
+var nrounds = argp.rounds;
+var cycles = argp.cycles;
+var limit = argp.limit;
+var audit = argp.audit;
+var baseline = argp.baseline;
+var mix = argp.mix;
+var lcp_mix = argp.lcp_mix;
 
 while (nrounds-- > 0) {
     console.log('round',seed);
     var rng = srand(seed);
-    if (!argp.opt('repeat')) seed++;
+    if (!argp.repeat) seed++;
     var ss = baseline ? new BaselineStore() : new ABRStringStore();
     var start = Date.now();
     var ary = [];
     var pool = new Set();
 
-    for (var ncon = 0; ncon < argp.opt('constants'); ncon++) {
+    for (var ncon = 0; ncon < argp.constants; ncon++) {
         var con = ss.singleton(ncon);
         ary.push(con);
         pool.add(con);
