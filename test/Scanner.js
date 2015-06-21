@@ -9,7 +9,7 @@ function deep(x) { console.log(require('util').inspect(x,{depth:null,colors:true
 function err(db,i) { var e = db.scanner.errors[i]; return e ? [ e.location.source.name, e.location.from, e.category, e.code ] : []; }
 function seg(db,i) { var e = db.statements[i]; return e ? [ e.type, e.raw, e.math, e.proof ] : []; }
 function seg2(db,i) { var e = db.statements[i]; return e ? [ e.type, e.raw, e.math, e.proof, e.label ] : []; }
-function pos(db,i,s) { return db.statements[i][s].map(function (v,ix) { return ix%2 ? v : v.name; }); }
+function pos(db,i,s) { return db.statements[i][s].map(function (v,ix) { return ix%2 ? v : v.source.name; }); }
 function errs(es) {
     it(`has ${es.length} errors`, function () { expect(db.scanner.errors.length).equal(es.length); });
     es.forEach(function (e,ix) {
