@@ -21,7 +21,7 @@ describe('Numberer analyzer:', () => {
         it('fetching pinkNumber throws for non-$a/$p', () => expect(() => dbt().statement(1).pinkNumber).to.throw(/statement does not have a pinkNumber/));
     });
 
-    describe.skip('handles updates:', () => {
+    describe('handles updates:', () => {
         let db;
         before(() => {
             db = parseSync('afile', '$c X $. $( A $) A $a X $. $( B $) B $a X $. $( C $) C $a X $.');
