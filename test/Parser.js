@@ -19,7 +19,7 @@ let cases = [
     { name: 'syntax $e', src: '$c wff X $.  eX $e wff X $.', err: { eX: [[[19,22], 'parser/essen-syntax' ]] } },
     { name: 'syntax $p ok', src: '$c wff X $.  eX $p wff X $= ? $.', err: { } },
     { name: 'ambiguous', src: '$c |- wff A $. wA1 $a wff A $. wA2 $a wff A $. ax $a |- A $.', err: { ax: [[[56,57],'parser/ambiguous', {one: 'wA1', two: 'wA2' } ]] } },
-    { name: 'no parse', src: LANG + 'test $a |- ( A ) $.', err: { test: [[[116,117], 'parser/parse-error', { expect: ['wff'] } ]] } },
+    { name: 'no parse', src: LANG + 'test $a |- ( A ) $.', err: { test: [[[116,117], 'parser/parse-error', { expect: ['$wff'] } ]] } },
     { name: 'truncated', src: LANG + 'test $a |- ( A A $.', err: { test: [[[101,105], 'parser/truncated', { expect: [')'] }]] } },
     { name: 'valid', src: LANG + 'test $a |- ( A ( A A ) ) $.', err: { test: [] }, tree: { test: 'w1(w0(),w1(w0(),w0()))' } },
 ];
