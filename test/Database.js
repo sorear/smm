@@ -102,4 +102,19 @@ describe('Database methods:', () => {
             it('updates index on old statement 2', () => { expect(db.statement(2).index).to.equal(2); });
         });
     });
+
+    describe('replaceMathString()', () => {
+        let db; before(() => { db = parseSync('afile', '$c x y z $.'); db.replaceMathString(db.statement(0),' x  z '); });
+        it('sets new text', () => expect(db.text).to.equal('$c x  z $.'));
+    });
+
+    describe('replaceMathString() for $p', () => {
+        let db; before(() => { db = parseSync('afile', 'x $p y $= z $.'); db.replaceMathString(db.statement(0),' qq '); });
+        it('sets new text', () => expect(db.text).to.equal('x $p qq $= z $.'));
+    });
+
+    describe('replaceProofString()', () => {
+        let db; before(() => { db = parseSync('afile', 'x $p y $= z $.'); db.replaceProofString(db.statement(0),' rr '); });
+        it('sets new text', () => expect(db.text).to.equal('x $p y $= rr $.'));
+    });
 });

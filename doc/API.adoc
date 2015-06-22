@@ -120,6 +120,8 @@ A statement which is in a database knows its database and index.
 [source]
 database.replaceStatements(3,4,'');
 database.replaceStatements(2,2,' $( A NEW COMMENT $)');
+database.replaceMathString(database.statement(2), ' 2 + 2 ');
+database.replaceProofString(database.statement(2), ' ? ');
 
 Databases can be modified by replacing a run of statements with a new run of statements.
 Several rules apply to ensure that the new database can still be parsed.
