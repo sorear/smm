@@ -9,7 +9,17 @@ function deep(x) { console.log(require('util').inspect(x,{depth:null,colors:true
 function err(db,i) { var e = db.scanner.errors[i]; return e ? [ e.location.source.name, e.location.from, e.category, e.code ] : []; }
 function seg(db,i) { var e = db.statements[i]; return e ? [ e.type, e.raw, e.math, e.proof ] : []; }
 function seg2(db,i) { var e = db.statements[i]; return e ? [ e.type, e.raw, e.math, e.proof, e.label ] : []; }
-function pos(db,i,s) { return db.statements[i][s].map(function (v,ix) { return ix%2 ? v : v.source.name; }); }
+function pos(db,i,s) {
+    let stmt = db.statements[i];
+    let ary = stmt[s];
+    if (typeof ary === 'number') ary = [ary];
+    let out = [];
+    ary.forEach(lin => {
+        let zone = stmt.reparse_zone.seek(lin);
+        out.push(zone.source.name, lin - zone.offset);
+    });
+    return out;
+}
 function errs(es) {
     it(`has ${es.length} errors`, function () { expect(db.scanner.errors.length).equal(es.length); });
     es.forEach(function (e,ix) {
@@ -69,7 +79,7 @@ describe('scan ${ token with leading whitespace:', function () {
     it('has one statement', function () { expect(db.statements.length).equal(1); });
     it('is OPEN statement', function () { expect(db.statements[0].type).equal(MMOM.Statement.OPEN); });
     it('containing source', function () { expect(db.statements[0].raw).equal('\n\n${'); });
-    it('has correct token position', function () { expect(db.statements[0].startPos[1]).equal(2); });
+    it('has correct token position', function () { expect(db.statements[0].startPos).equal(2); });
     errs([]);
 });
 
@@ -78,7 +88,7 @@ describe('scan ${ token with trailing whitespace:', function () {
     it('has two statements', function () { expect(db.statements.length).equal(2); });
     it('is OPEN statement', function () { expect(db.statements[0].type).equal(MMOM.Statement.OPEN); });
     it('containing source', function () { expect(db.statements[0].raw).equal('${'); });
-    it('has correct token position', function () { expect(db.statements[0].startPos[1]).equal(0); });
+    it('has correct token position', function () { expect(db.statements[0].startPos).equal(0); });
     it('is EOF statement', function () { expect(db.statements[1].type).equal(MMOM.Statement.EOF); });
     it('containing source', function () { expect(db.statements[1].raw).equal('\n\n'); });
     errs([]);
@@ -96,9 +106,9 @@ describe('scan $c statement:', function () {
     it('has one statement', function () { expect(db.statements.length).equal(1); });
     it('is CONSTANT statement', function () { expect(db.statements[0].type).equal(MMOM.Statement.CONSTANT); });
     it('has math string', function () { expect(db.statements[0].math).eql(['a','b']); });
-    it('has math positions (length)', function () { expect(db.statements[0].mathPos.length).equal(4); });
-    it('has math positions (1)', function () { expect(db.statements[0].mathPos[1]).equal(3); });
-    it('has math positions (2)', function () { expect(db.statements[0].mathPos[3]).equal(6); });
+    it('has math positions (length)', function () { expect(db.statements[0].mathPos.length).equal(2); });
+    it('has math positions (1)', function () { expect(db.statements[0].mathPos[0]).equal(3); });
+    it('has math positions (2)', function () { expect(db.statements[0].mathPos[1]).equal(6); });
     errs([]);
 });
 
@@ -107,9 +117,9 @@ describe('scan $c statement with embedded comment:', function () {
     it('has one statement', function () { expect(db.statements.length).equal(1); });
     it('is CONSTANT statement', function () { expect(db.statements[0].type).equal(MMOM.Statement.CONSTANT); });
     it('has math string', function () { expect(db.statements[0].math).eql(['a','b']); });
-    it('has math positions (length)', function () { expect(db.statements[0].mathPos.length).equal(4); });
-    it('has math positions (1)', function () { expect(db.statements[0].mathPos[1]).equal(3); });
-    it('has math positions (2)', function () { expect(db.statements[0].mathPos[3]).equal(17); });
+    it('has math positions (length)', function () { expect(db.statements[0].mathPos.length).equal(2); });
+    it('has math positions (1)', function () { expect(db.statements[0].mathPos[0]).equal(3); });
+    it('has math positions (2)', function () { expect(db.statements[0].mathPos[1]).equal(17); });
     errs([]);
 });
 
