@@ -57,6 +57,12 @@ The parsing process will attempt to recover from arbitrary errors in the source,
 Some statements will be repaired, those which cannot will be turned into `BOGUS` type statements.
 However, a database with parsing errors cannot be modified, due to the difficulty in updating the parsing error data after changes.
 
+[source]
+text = database.text
+
+Convert a database back into text, to save in a file.
+Does not support `$[` `$]`.
+
 === Statements
 
 [source]
@@ -95,6 +101,14 @@ arrayString = statement.proof;
 Accessors for the fundamental parts of a statement.
 `math` and `proof` may be `null` on statement types for which they are not applicable;
 when they are applicable, they will always be present even if empty.
+
+[source]
+text = statement.raw;         // the while statement
+text = statement.mathText;    // inside $acefpv $=.
+text = statement.proofText;   // inside $= $.
+text = statement.commentText; // inside $( $), COMMENT only
+
+Accessors for portions of a statement, identified but with whitespace and embedded comments preserved.
 
 [source]
 index = statement.index;
