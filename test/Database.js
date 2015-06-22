@@ -39,6 +39,15 @@ describe('Database methods:', () => {
         it('can fetch raw', () => {
             expect(parseSync('afile', x => '$( A $) $( B $) $( C $)').statement(1).raw).to.equal(' $( B $)');
         });
+        it('can fetch commentText', () => {
+            expect(parseSync('afile', x => '$( A $) $( B $) $( C $)').statement(1).commentText).to.equal(' B ');
+        });
+        it('can fetch mathText', () => {
+            expect(parseSync('afile', x => '$c X $. Y $p X $= X X $.').statement(1).mathText).to.equal(' X ');
+        });
+        it('can fetch proofText', () => {
+            expect(parseSync('afile', x => '$c X $. Y $p X $= X X $.').statement(1).proofText).to.equal(' X X ');
+        });
     });
 
     describe('replaceStatements()', () => {
