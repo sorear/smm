@@ -1,0 +1,21 @@
+== Simple browser embedding demo
+
+. Copy a set.mm file into `webtest/`
+
+. Copy in transpiled source files:
++
+    babel -m umd lib -d webtest/
+    npm install # for BigInt.js
+    cp node_modules/BigInt/src/BigInt.js webtest/
+
+. Expose webtest/ on an HTTP server (this will not work over `file://`)
+
+. Load the index.html in a browser supporting native `Promise`, `Set`, `Map`, and `window.fetch` such as Chrome 43
+
+. After it loads, use the developer console to interact with the SetMM global.  Examples:
+
+    SetMM.parser.parseStatement(SetMM.scoper.lookup('quartfull').labelled).dump()
+    SetMM.statementCount
+    SetMM.metadata.param('htmlvarcolor')
+    SetMM.replaceStatements(SetMM.statementCount-1, SetMM.statementCount-1, ' blargle $a |- CHOICE $.')
+    SetMM.scoper.lookup('blargle').labelled.mathText

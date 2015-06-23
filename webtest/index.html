@@ -1,0 +1,18 @@
+<html>
+    <head>
+        <script src="BigInt.js"></script>
+        <script src="ABRStringStore.js"></script>
+        <script src="MMOM.js"></script>
+        <script src="Scoper.js"></script>
+        <script src="Parser.js"></script>
+        <script src="Verifier.js"></script>
+        <script src="Numberer.js"></script>
+        <script src="Metadata.js"></script>
+        <script>
+            MMOM.parseAsync('set.mm', function (filename) {
+                return fetch(filename).then(function (resp) { return resp.text(); });
+            }).then(function (db) { window.SetMM = db; });
+        </script>
+    </head>
+    <body></body>
+</html>
