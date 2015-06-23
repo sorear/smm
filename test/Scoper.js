@@ -63,7 +63,7 @@ var cases = [
         name: 'constant not in top scope',
         src: '${ $c x $. $}',
         errs: [
-            ['afile',3,'scope','const-not-top-scope'],
+            ['afile',3,'scope','const-not-top-scope','afile',0],
         ],
     },
     {
