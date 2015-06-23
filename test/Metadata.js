@@ -6,7 +6,7 @@ import '../lib/Metadata';
 describe('metadata parser:', () => {
     function tcase(hash) {
         describeDB(hash.name, hash.src, dbt => {
-            testErrorMap(dbt, () => dbt().metadata.allErrors, hash.errors, { flat: true });
+            if (hash.errors) testErrorMap(dbt, () => dbt().metadata.allErrors, hash.errors, { flat: true });
             Object.keys(hash.params || {}).forEach(key => {
                 it(`has param ${key}: ${hash.params[key]}`, () => { expect(dbt().metadata.param(key)).to.equal(hash.params[key]); });
             });
@@ -27,6 +27,7 @@ describe('metadata parser:', () => {
     tcase({ name: 'Missing directive', src: '$( $t ; $)', errors: [[[6,6],'metadata/missing-directive']] });
 
     tcase({ name: 'Basic parameter', src: '$( $t htmlhome "foo"; $)', errors: [], params: { htmlhome: 'foo' } });
+    tcase({ name: 'Parameter functions without checking errors', src: '$( $t htmlhome "foo"; $)', params: { htmlhome: 'foo' } });
     tcase({ name: 'Parameter with ; missing', src: '$( $t htmlhome "foo" $)', errors: [[[21,21],'metadata/missing-semicolon-eof']] });
     tcase({ name: 'Parameter with extra tokens', src: '$( $t htmlhome "foo" "bar"; $)', errors: [[[21,21],'metadata/expected-end']] });
     tcase({ name: 'Parameter with unquoted argument', src: '$( $t htmlhome foo; $)', errors: [[[15,15],'metadata/expected-string']] });
