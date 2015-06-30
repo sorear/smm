@@ -1,4 +1,4 @@
-import { MMOMErrorLocation, parseSync } from '../../lib/MMOM';
+import { MMOMErrorLocation, parseSync } from '../../lib/smm/mmom';
 // describe, before, it are actually poked into the global scope by mocha >_>
 import { expect } from 'chai';
 

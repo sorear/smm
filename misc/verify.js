@@ -1,11 +1,11 @@
 function write(str) { process.stdout.write(str.toString(), 'utf8'); };
 
-import { parseSync } from '../lib/MMOM.js';
-import '../lib/Scoper.js';
-import '../lib/Verifier.js';
-import '../lib/Parser.js';
-import '../lib/ConsoleErrorFormatter.js';
-import '../lib/Metadata.js';
+import { parseSync } from '../lib/smm/mmom';
+import '../lib/smm/scoper';
+import '../lib/smm/verifier-standard';
+import '../lib/smm/parser';
+import '../lib/smm/console-error-formatter';
+import '../lib/smm/metadata';
 
 function time(why,f) {
     let time_1 = Date.now();

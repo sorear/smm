@@ -1,4 +1,4 @@
-import { parseSync, MMOMStatement } from '../lib/MMOM';
+import { parseSync, MMOMStatement } from '../lib/smm/mmom';
 
 let db = parseSync(process.argv[2], fn => require('fs').readFileSync(fn, 'utf8'));
 for (let i = 0; i < db.statementCount; i++) {

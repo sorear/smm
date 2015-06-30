@@ -1,7 +1,7 @@
-import {parseSync} from '../lib/MMOM';
-import {describeDB, testErrorMap} from './lib/Util';
+import {parseSync} from '../lib/smm/mmom';
+import {describeDB, testErrorMap} from './lib/util';
 import {expect} from 'chai';
-import '../lib/Metadata';
+import '../lib/smm/metadata';
 
 describe('metadata parser:', () => {
     function tcase(hash) {

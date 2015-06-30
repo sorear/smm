@@ -1,7 +1,7 @@
-var MMOM = require('../lib/MMOM');
+var MMOM = require('../lib/smm/mmom');
 var expect = require('chai').expect;
-require('../lib/ConsoleErrorFormatter');
-require('../lib/Scoper');
+require('../lib/smm/console-error-formatter');
+require('../lib/smm/scoper');
 
 describe('ConsoleErrorFormatter:', function () {
     it('basic case', function () { expect(MMOM.parseSync('afile','$( x\ny $) $. $( z\nw $)').scanner.errors[0].toConsoleString()).to.equal('afile:2:6:error: $. found where not expected (no current statement)\n|y $) »$.« $( z\n'); });

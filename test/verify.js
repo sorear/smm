@@ -1,7 +1,7 @@
-var MMOM = require('../lib/MMOM.js');
+var MMOM = require('../lib/smm/mmom');
 var expect = require('chai').expect;
-require('../lib/Scoper.js');
-require('../lib/Verifier.js');
+require('../lib/smm/scoper');
+require('../lib/smm/verifier-standard');
 var db, vErr;
 function src(x) {
     before(function () {

@@ -1,8 +1,8 @@
-import { MMOMStatement, parseSync } from '../lib/MMOM';
-import { describeDB } from './lib/Util';
+import { MMOMStatement, parseSync } from '../lib/smm/mmom';
+import { describeDB } from './lib/util';
 import { expect } from 'chai';
-import '../lib/Numberer';
-import '../lib/Scoper';
+import '../lib/smm/numberer';
+import '../lib/smm/scoper';
 
 describe('Numberer analyzer:', () => {
     describeDB('Test database', '$( Comment $) ${ $c X $. $( Another $) $( And another $) A $a X $. B $a X $. $}', dbt => {

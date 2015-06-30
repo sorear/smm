@@ -1,4 +1,4 @@
-var ABRStringStore = require('../lib/ABRStringStore.js');
+var ABRStringStore = require('../lib/smm/abr-string-store.js');
 var pars = require('dashdash').createParser({ options: [
     { name: 'rounds',    default: 1,    type: 'positiveInteger', help: 'Number of times to run the test (resetting store between)' },
     { name: 'cycles',    default: 1000, type: 'positiveInteger', help: 'Number of operations to run in each test' },

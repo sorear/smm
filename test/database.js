@@ -1,4 +1,4 @@
-import { parseSync, MMOMDatabase, MMOMStatement } from '../lib/MMOM';
+import { parseSync, MMOMDatabase, MMOMStatement } from '../lib/smm/mmom';
 import { expect } from 'chai';
 
 describe('Database methods:', () => {

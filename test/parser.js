@@ -1,6 +1,6 @@
-import { describeDB, testErrorMap } from './lib/Util';
+import { describeDB, testErrorMap } from './lib/util';
 import { expect } from 'chai';
-import '../lib/Parser';
+import '../lib/smm/parser';
 
 let LANG = '$c |- wff ( ) A $. $v ph ps $. f0 $f wff ph $. f1 $f wff ps $. w0 $a wff A $. w1 $a wff ( ph ps ) $. ';
 let cases = [

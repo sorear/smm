@@ -1,6 +1,6 @@
-import { parseSync } from '../lib/MMOM';
-import '../lib/Parser';
-import '../lib/ConsoleErrorFormatter';
+import { parseSync } from '../lib/smm/mmom';
+import '../lib/smm/parser';
+import '../lib/smm/console-error-formatter';
 
 if (!process.argv[2]) throw '1st arg must be a database';
 let db = parseSync(process.argv[2], fn => require('fs').readFileSync(fn, 'utf8'));
