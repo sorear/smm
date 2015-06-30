@@ -19,13 +19,10 @@ Statements own their leading whitespace.
 Whitespace at the end of the file is owned by the special `EOF` statement.
 Comments are treated as whitespace if found inside statements, but are promoted to statements in their own right if they appear between statements.
 
-Several SMM modules function by installing new methods on prototypes from other modules.
-Since modifying prototypes after optimized code generation is problematic, try to load all the modules you will use as early as possible.
-
 === Parsing
 
 [source]
-import { parseSync } from 'smm/MMOM';
+import { parseSync } from 'smm';
 database = parseSync('filename', '$( file content $)');
 
 Call `parseSync` with two strings to parse a database which is already loaded as a string.
@@ -46,7 +43,7 @@ The second argument to `parseSync` may be a function, which will be passed a fil
 Exceptions will be wrapped into `failed-to-read` errors.
 
 [source]
-import { parseAsync } from 'smm/MMOM'
+import { parseAsync } from 'smm'
 promise = parseAsync('file1', filename =>
     fetch(filename).then(rpy => rpy.text())).then(db => ... );
 
@@ -79,7 +76,7 @@ Statements are immutable.
 To change a database, splice in new statements; do not attempt to modify existing ones.
 
 [source]
-import { MMOMStatement } from 'smm/MMOM';
+import { MMOMStatement } from 'smm';
 statement.type === MMOMStatement.OPEN;
 statement.type === MMOMStatement.CLOSE;
 statement.type === MMOMStatement.CONSTANT;
@@ -131,7 +128,6 @@ Several rules apply to ensure that the new database can still be parsed.
 This module calculates scopes and symbol tables.
 
 [source]
-import 'smm/Scoper';
 let sym = database.scoper.lookup('ruc');
 database.verifier.errors(sym.labelled);
 
@@ -148,7 +144,6 @@ It implements the common error checking protocol but has no other API.
 Metadata from the $t comment can be accessed using the metadata analyzer.
 
 [source]
-import 'smm/Metadata';
 title = database.metadata.param('htmltitle');
 andsign = database.metadata.tokenDef('htmldef', '/\\');
 
@@ -158,11 +153,9 @@ Both methods return `null` if not defined.
 
 [source]
 ----
-import 'smm/Scoper';
 array_of_errors = database.scoper.errors(statement);
 map_of_errors = database.scoper.allErrors;
 
-import 'smm/Verifier';
 array_of_errors = database.verifier.errors(statement);
 map_of_errors = database.verifier.allErrors;
 ----

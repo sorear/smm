@@ -1,11 +1,6 @@
 function write(str) { process.stdout.write(str.toString(), 'utf8'); };
 
-import { parseSync } from '../lib/smm/mmom';
-import '../lib/smm/scoper';
-import '../lib/smm/verifier-standard';
-import '../lib/smm/parser';
-import '../lib/smm/console-error-formatter';
-import '../lib/smm/metadata';
+import { parseSync } from '../lib/smm';
 
 function time(why,f) {
     let time_1 = Date.now();
