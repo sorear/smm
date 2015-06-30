@@ -1,5 +1,6 @@
 import { parseSync, MMOMDatabase, MMOMStatement } from '../lib/smm/mmom';
 import { expect } from 'chai';
+import { describeDB } from './lib/util';
 
 describe('Database methods:', () => {
     describe('parseSync', () => {
@@ -48,6 +49,15 @@ describe('Database methods:', () => {
         it('can fetch proofText', () => {
             expect(parseSync('afile', x => '$c X $. Y $p X $= X X $.').statement(1).proofText).to.equal(' X X ');
         });
+    });
+
+    describeDB('statement methods', '$c X $.  $c Y $.  $c Z $.', dbt => {
+        it('prev of first', () => expect(dbt().statement(0).prev).to.equal(null));
+        it('prev of #1', () => expect(dbt().statement(1).prev.index).to.equal(0));
+        it('prev of #2', () => expect(dbt().statement(2).prev.index).to.equal(1));
+        it('next of #0', () => expect(dbt().statement(0).next.index).to.equal(1));
+        it('next of #1', () => expect(dbt().statement(1).next.index).to.equal(2));
+        it('last of last', () => expect(dbt().statement(2).next).to.equal(null));
     });
 
     describe('replaceStatements()', () => {
