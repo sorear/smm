@@ -1,5 +1,5 @@
 {
-  "name": "smetamath",
+  "name": "smm",
   "version": "0.2.0",
   "description": "sorear metamath toolkit",
   "main": "index.js",
@@ -8,7 +8,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/sorear/smetamath.git"
+    "url": "git+https://github.com/sorear/smm.git"
   },
   "keywords": [
     "metamath"
@@ -17,9 +17,9 @@
   "license": "MIT",
   "private": true,
   "bugs": {
-    "url": "https://github.com/sorear/smetamath/issues"
+    "url": "https://github.com/sorear/smm/issues"
   },
-  "homepage": "https://github.com/sorear/smetamath#readme",
+  "homepage": "https://github.com/sorear/smm#readme",
   "devDependencies": {
     "babel": "^5.5.8",
     "chai": "^3.0.0",
