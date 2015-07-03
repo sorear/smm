@@ -2,6 +2,7 @@ import { describeDB, testErrorMap } from './lib/util';
 import { expect } from 'chai';
 import '../lib/smm/parser';
 
+let TYPESPEC = " $( $t -smm-syntactic-categories 'set' 'class' 'wff'; -smm-logical-categories '|-' 'wff'; $)";
 let LANG = '$c |- wff ( ) A $. $v ph ps $. f0 $f wff ph $. f1 $f wff ps $. w0 $a wff A $. w1 $a wff ( ph ps ) $. ';
 let cases = [
     { name: '$f (ok)', src: '$c wff $.  $v ph $.  wph $f wff ph $.', err: { wph: [] } },
@@ -25,7 +26,7 @@ let cases = [
 ];
 
 cases.forEach(cc => {
-    describeDB(cc.name, cc.src, dbt => {
+    describeDB(cc.name, cc.src + TYPESPEC, dbt => {
         testErrorMap(dbt, () => dbt().parser.allErrors, cc.err);
         if (cc.tree) Object.keys(cc.tree).forEach(tr => {
             it(`parse for ${tr}`, () => {
