@@ -37,7 +37,7 @@ describe('parser, i/o', () => {
             testErrorMap(dbt, () => dbt().parser.allErrors, cc.err);
             if (cc.tree) Object.keys(cc.tree).forEach(tr => {
                 it(`parse for ${tr}`, () => {
-                    let pars = dbt().parser.parseStatement(dbt().scoper.lookup(tr).labelled);
+                    let pars = dbt().scoper.lookup(tr).labelled.assertionParseTree;
                     expect(pars && pars.dump()).equal(cc.tree[tr]);
                 });
             });
