@@ -60,6 +60,12 @@ describe('Database methods:', () => {
         it('last of last', () => expect(dbt().statement(2).next).to.equal(null));
     });
 
+    describeDB('isAssertion', '$c X $.  A $a X $.  B $p X $= ? $.', dbt => {
+        it('$c not assertion', () => expect(dbt().statement(0).isAssertion).to.equal(false));
+        it('$a is assertion', () => expect(dbt().statement(1).isAssertion).to.equal(true));
+        it('$p is assertion', () => expect(dbt().statement(2).isAssertion).to.equal(true));
+    });
+
     describe('replaceStatements()', () => {
         it('throws if there are any errors', () => {
             expect(() => parseSync('afile', '$$').replaceStatements(0,0,' $( $) ')).to.throw(/low level syntax errors/);
