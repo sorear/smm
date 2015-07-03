@@ -8,6 +8,7 @@ describe('Numberer analyzer:', () => {
     describeDB('Test database', '$( Comment $) ${ $c X $. $( Another $) $( And another $) A $a X $. B $a X $. $}', dbt => {
         it('has 3 comments', () => expect(dbt().numberer.counts[MMOMStatement.COMMENT]).to.equal(3));
         it('has 2 axioms', () => expect(dbt().numberer.counts[MMOMStatement.AXIOM]).to.equal(2));
+        it('has 2 assertions', () => expect(dbt().assertionCount).to.equal(2));
         it('first real statement has metamathNumber 1', () => expect(dbt().statement(1).metamathNumber).to.equal(1));
         it('third real statement has metamathNumber 3', () => expect(dbt().scoper.lookup('A').labelled.metamathNumber).to.equal(3));
         it('first axiom has pinkNumber 1', () => expect(dbt().scoper.lookup('A').labelled.pinkNumber).to.equal(1));
