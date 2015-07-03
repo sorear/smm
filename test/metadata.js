@@ -8,7 +8,7 @@ describe('metadata parser:', () => {
         describeDB(hash.name, hash.src, dbt => {
             if (hash.errors) testErrorMap(dbt, () => dbt().metadata.allErrors, hash.errors, { flat: true });
             Object.keys(hash.params || {}).forEach(key => {
-                it(`has param ${key}: ${hash.params[key]}`, () => { expect(dbt().metadata.param(key)).to.equal(hash.params[key]); });
+                it(`has param ${key}: ${hash.params[key]}`, () => { expect(dbt().metadata.param(key)).to.eql(hash.params[key]); });
             });
             (hash.html || []).forEach(html =>
                 it(`has ${html[0]} for ${html[1]} = ${html[2]}`, () => expect(dbt().metadata.tokenDef(html[0],html[1])).equal(html[2])));
@@ -73,4 +73,9 @@ describe('metadata parser:', () => {
     tcase({ name: 'htmldef syntax, expect "as" (other)', src: '$( $t htmldef "foo" ; $)', errors: [[[20,20],'metadata/expected-as']] });
     tcase({ name: 'htmldef syntax, result quote', src: '$( $t htmldef "foo" as bar; $)', errors: [[[23,23],'metadata/expected-string']] });
     tcase({ name: 'htmldef syntax, trailing', src: '$( $t htmldef "foo" as "bar" baz; $)', errors: [[[29,29],'metadata/expected-end']] });
+
+    // Not standard
+    tcase({ name: 'Basic array param', src: '$( $t -smm-syntactic-categories "foo" "bar"; $)', errors: [], params: { '-smm-syntactic-categories': ['foo','bar'] } });
+    tcase({ name: 'Non-string in array param', src: '$( $t -smm-syntactic-categories "foo" bar; $)', errors: [[[38,38],'metadata/expected-string']] });
+    tcase({ name: 'Colliding array param', src: '$( $t -smm-syntactic-categories "foo"; -smm-syntactic-categories "bar"; $)', errors: [[[39,64],'metadata/duplicate-parameter',{prev:[6,38]}]] });
 });
