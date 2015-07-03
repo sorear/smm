@@ -23,10 +23,16 @@ let cases = [
     { name: 'no parse', src: LANG + 'test $a |- ( A ) $.', err: { test: [[[116,117], 'parser/parse-error', { expect: ['$wff'] } ]] } },
     { name: 'truncated', src: LANG + 'test $a |- ( A A $.', err: { test: [[[101,105], 'parser/truncated', { expect: [')'] }]] } },
     { name: 'valid', src: LANG + 'test $a |- ( A ( A A ) ) $.', err: { test: [] }, tree: { test: 'w1(w0(),w1(w0(),w0()))' } },
+
+    { name: 'no syntax no problem', src: '$c X $. a0 $a X X $. $( $t $)', err: {} },
+    { name: 'duplicated syncat', src: '$( $t -smm-syntactic-categories "foo" "foo"; $)', err: { '0': [[[6,44],'parser/syntactic-category-repeated',{symbol:'foo'}]] } },
+    { name: 'odd length roles', src: '$( $t -smm-logical-categories "foo"; $)', err: { '0': [[[6,36],'parser/logical-category-unpaired',{symbol:'foo'}]] } },
+    { name: 'undeclared roles', src: '$( $t -smm-logical-categories "foo" "bar"; $)', err: { '0': [[[6,42],'parser/logical-category-syntax-undeclared',{symbol:'bar'}]] } },
+    { name: 'repeated roles', src: '$( $t -smm-syntactic-categories "bar"; -smm-logical-categories "foo" "bar" "foo" "bar"; $)', err: { '0': [[[39,87],'parser/logical-category-repeated',{symbol:'foo'}]] } },
 ];
 
 cases.forEach(cc => {
-    describeDB(cc.name, cc.src + TYPESPEC, dbt => {
+    describeDB(cc.name, / \$t /.test(cc.src) ? cc.src : cc.src + TYPESPEC, dbt => {
         testErrorMap(dbt, () => dbt().parser.allErrors, cc.err);
         if (cc.tree) Object.keys(cc.tree).forEach(tr => {
             it(`parse for ${tr}`, () => {
