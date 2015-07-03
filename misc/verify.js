@@ -15,7 +15,7 @@ time('parse', () => {
     db = parseSync(process.argv[2], s => require('fs').readFileSync(s, 'utf8'));
     db.scanner.errors.forEach(e => write(e.toConsoleString()));
 });
-['scoper','parser','metadata','verifier'].forEach(stage => {
+['scoper','metadata','parser','verifier'].forEach(stage => {
     time(stage, () => {
         db[stage].allErrors.forEach(errs => {
             errs.forEach(e => write(e.toConsoleString()));

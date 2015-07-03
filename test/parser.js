@@ -31,14 +31,29 @@ let cases = [
     { name: 'repeated roles', src: '$( $t -smm-syntactic-categories "bar"; -smm-logical-categories "foo" "bar" "foo" "bar"; $)', err: { '0': [[[39,87],'parser/logical-category-repeated',{symbol:'foo'}]] } },
 ];
 
-cases.forEach(cc => {
-    describeDB(cc.name, / \$t /.test(cc.src) ? cc.src : cc.src + TYPESPEC, dbt => {
-        testErrorMap(dbt, () => dbt().parser.allErrors, cc.err);
-        if (cc.tree) Object.keys(cc.tree).forEach(tr => {
-            it(`parse for ${tr}`, () => {
-                let pars = dbt().parser.parseStatement(dbt().scoper.lookup(tr).labelled);
-                expect(pars && pars.dump()).equal(cc.tree[tr]);
+describe('parser, i/o', () => {
+    cases.forEach(cc => {
+        describeDB(cc.name, / \$t /.test(cc.src) ? cc.src : cc.src + TYPESPEC, dbt => {
+            testErrorMap(dbt, () => dbt().parser.allErrors, cc.err);
+            if (cc.tree) Object.keys(cc.tree).forEach(tr => {
+                it(`parse for ${tr}`, () => {
+                    let pars = dbt().parser.parseStatement(dbt().scoper.lookup(tr).labelled);
+                    expect(pars && pars.dump()).equal(cc.tree[tr]);
+                });
             });
         });
     });
+});
+
+describeDB('parser getTemplate', LANG + TYPESPEC, dbt => {
+    it('non-syntax-axiom has no template', () => expect(dbt().statement(0).parsingRule).to.equal(undefined));
+    let rulet = () => dbt().scoper.lookup('w1').labelled.parsingRule;
+    it('template has a type', () => expect(rulet().type).to.equal('wff'));
+    it('template has an arity', () => expect(rulet().arity).to.equal(2));
+    it('template has a slot list', () => expect(rulet().slots.length).to.equal(4));
+    it('constant slot.lit', () => expect(rulet().slots[0].lit).to.equal('('));
+    it('constant slot.index', () => expect(rulet().slots[0].index).to.equal(-1));
+    it('variable slot.lit', () => expect(rulet().slots[1].lit).to.equal('ph'));
+    it('variable slot.index', () => expect(rulet().slots[1].index).to.equal(0));
+    it('variable slot.type', () => expect(rulet().slots[1].type).to.equal('wff'));
 });
