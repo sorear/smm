@@ -30,6 +30,8 @@ commentary
 $)
 `, dbt => {
     it('finds the outlines and only the outlines', () => expect(dbt().outlineNodes.length).to.equal(3));
+    it('finds minimum level', () => expect(dbt().outlineLevelBase).to.equal(1));
+    it('finds maximum level', () => expect(dbt().outlineLevelsUsed).to.equal(3));
     describe('first outline comment', () => {
         it('statement #', () => expect(dbt().outlineNodes[0].statement.index).to.equal(0));
         it('level', () => expect(dbt().outlineNodes[0].level).to.equal(1));
