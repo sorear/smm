@@ -25,7 +25,8 @@ $(
 =-=-=-=-=-=-
     A section, with prose 
 =-=-=-=-=-
-This is commentary
+This is
+commentary
 $)
 `, dbt => {
     it('finds the outlines and only the outlines', () => expect(dbt().outlineEntries.length).to.equal(3));
@@ -42,6 +43,6 @@ $)
     describe('third outline comment', () => {
         it('statement #', () => expect(dbt().outlineEntries[2].statement.index).to.equal(4));
         it('title', () => expect(dbt().outlineEntries[2].title).to.equal('A section, with prose'));
-        it('prologue', () => expect(dbt().outlineEntries[2].prologue).to.equal('This is commentary'));
+        it('prologue', () => expect(dbt().outlineEntries[2].prologue).to.equal('This is\ncommentary'));
     });
 });
