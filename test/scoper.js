@@ -1,6 +1,7 @@
 var MMOM = require('../lib/smm/mmom');
 var expect = require('chai').expect;
 require('../lib/smm/scoper');
+import { describeDB } from './lib/util';
 var db, errlist;
 function src(x) {
     before(function () {
@@ -348,9 +349,16 @@ var cases = [
     },
 ];
 
-cases.forEach(function (cc) {
-    describe(`${cc.name}:`, function () {
-        src(cc.src);
-        errs(cc.errs);
+describe('scoper i/o:', () => {
+    cases.forEach(function (cc) {
+        describe(`${cc.name}:`, function () {
+            src(cc.src);
+            errs(cc.errs);
+        });
     });
+});
+
+describeDB('scoper utilities', '$c foo $.  bar $a foo $.', dbt => {
+    it('statementByLabel (fail)', () => expect(dbt().statementByLabel('bar2')).to.equal(null));
+    it('statementByLabel (success)', () => expect(dbt().statementByLabel('bar').math).to.eql(['foo']));
 });
