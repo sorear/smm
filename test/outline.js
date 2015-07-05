@@ -94,4 +94,22 @@ $)
     it('outline for #4 ord', () => expect(dbt().statement(4).outlineNode.path.map(x => x.ordinal)).to.eql([1,1,1]));
     it('outline for #5', () => expect(dbt().statement(5).outlineNode.path.map(x => x.slug)).to.eql(['p1','c1-2']));
     it('outline for #5 ord', () => expect(dbt().statement(5).outlineNode.path.map(x => x.ordinal)).to.eql([1,2]));
+
+    it('outline root: 1 part', () => expect(dbt().outlineRoots.length).to.equal(1));
+    it('outline root is p1', () => expect(dbt().outlineRoots[0].slug).to.equal('p1'));
+    it('outline root has 2 chapters', () => expect(dbt().outlineRoots[0].children.map(x => x.slug)).to.eql(['c1','c1-2']));
+    it('1st chapter has 1 section', () => expect(dbt().outlineRoots[0].children[0].children.map(x => x.slug)).to.eql(['s2']));
+
+    it('outlineBySlug, failure', () => expect(dbt().outlineBySlug('s3')).to.equal(null));
+    it('outlineBySlug, success', () => expect(dbt().outlineBySlug('s2').slug).to.equal('s2'));
+
+    it('siblings, root', () => expect(dbt().outlineBySlug('p1').siblings.map(x => x.slug)).to.eql(['p1']));
+    it('siblings, non-root', () => expect(dbt().outlineBySlug('c1').siblings.map(x => x.slug)).to.eql(['c1','c1-2']));
+
+    it('inFlow check, true', () => expect(dbt().outlineBySlug('p1').inFlow).to.equal(true));
+    it('inFlow check, true 2', () => expect(dbt().outlineBySlug('s2').inFlow).to.equal(true));
+    it('inFlow check, false', () => expect(dbt().outlineBySlug('s1').inFlow).to.equal(false));
+
+    it('parent, root', () => expect(dbt().outlineBySlug('p1').parent).to.equal(null));
+    it('parent, not root', () => expect(dbt().outlineBySlug('c1').parent.slug).to.equal('p1'));
 });
