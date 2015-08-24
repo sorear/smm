@@ -129,7 +129,7 @@ This module calculates scopes and symbol tables.
 
 [source]
 let sym = database.scoper.lookup('ruc');
-database.scoper.errors(sym.labelled);
+database.verifier.errors(sym.labelled);
 
 Symbol table entries are returned as objects with slots for different types of usage of symbols.
 Currently only labelled (find the statement with this label) has API status.
