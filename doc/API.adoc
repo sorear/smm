@@ -100,7 +100,7 @@ Accessors for the fundamental parts of a statement.
 when they are applicable, they will always be present even if empty.
 
 [source]
-text = statement.raw;         // the while statement
+text = statement.raw;         // the whole statement
 text = statement.mathText;    // inside $acefpv $=.
 text = statement.proofText;   // inside $= $.
 text = statement.commentText; // inside $( $), COMMENT only
@@ -129,7 +129,7 @@ This module calculates scopes and symbol tables.
 
 [source]
 let sym = database.scoper.lookup('ruc');
-database.verifier.errors(sym.labelled);
+database.scoper.errors(sym.labelled);
 
 Symbol table entries are returned as objects with slots for different types of usage of symbols.
 Currently only labelled (find the statement with this label) has API status.
