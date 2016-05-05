@@ -15,7 +15,7 @@ function print(slots, map, node) {
         case 'cv': return out;
         case 'wceq': case 'wcel':
             return out + lbl.replace('c','') + '(); ';
-        case 'wph': case 'wps': case 'vx': case 'vy': case 'vz': case 'vw': case 'vu': case 'vt': case 'vv':
+        case 'wph': case 'wps': case 'wch': case 'vx': case 'vy': case 'vz': case 'vw': case 'vu': case 'vt': case 'vv':
             if (!map[lbl]) {
                 if (!slots.length) throw 'out of slots';
                 map[lbl] = slots.shift();
@@ -26,4 +26,6 @@ function print(slots, map, node) {
     }
 }
 
-console.log(print(['vA','vB','vC','vD','vE','vF','vG'],{},db.statementByLabel(process.argv[3]).assertionParseTree));
+let stmt = db.statementByLabel(process.argv[3]);
+console.log(`/* ${stmt.label}: ${stmt.math.slice(1).join(' ')} */`);
+console.log(print(['vA','vB','vC','vD','vE','vF','vG'],{},stmt.assertionParseTree));
