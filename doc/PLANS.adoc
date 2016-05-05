@@ -1,0 +1,96 @@
+= Planned implementations by category
+
+== Coding
+
+* Javascript and require.js are baselined
+* Core logic should support both node.js and browser
+* Framework if any for browser UNDECIDED
+
+== MMOM
+
+* Prior art
+** metamath.c uses: An array of statements, with pointers to source text and frame data
+** mmj2: similar, but with more maps and sidecar tables
+* Our goals
+** Semantic fidelity: track statements, proofs
+** Lazy loading: especially for read-only mode, it should be possible to generate a list page or proof page without reading everything
+** Syntactic fidelity
+** Editability
+* Strawman 1
+** A list of statements (that are just segmented text)
+** Several lazily-recalculating overlays
+
+* UNDECIDED ???
+* Likely based on metamath.c structures, with lazily constructed overlays ???
+* TODO: study MMJ2 "LogicalSystem" data structures.
+
+== File Parser
+
+* Depends on MMOM design
+* May be expedient to save parsed data as JSON for fast loads.
+
+== Math Parser
+
+* Marpa was baselined earlier, but the hyper-unambiguous nature of set.mm allows a packrat parser to run in guaranteed linear time
+* Dynamic compilation is a good idea
+* Could offer Earley/Marpa (much) later for non set.mm systems.  Even for modes where the .mm syntax differs from displayed syntax.
+* Can be instrumented to output the parsing HWM, in-progress failed subexpressions, and expected terminals/nonterminals for user input feedback.
+
+== Verifier
+
+* Ideally parser-aware.  We can't always check for ambiguity, but we can always ensure that no punning occurred.
+* http://www.informatik.uni-leipzig.de/~lohrey/12-SURVEY.pdf has everything you need for a quadratic time (huge constants) string verifier, might be a cute toy
+** No public implementation of the Alstrup-Brodal-Rauhe algorithm ?!  I shall have to fix this
+** can optimize using general constant weight codes [paper: 2**32 -> 64 -> 12 -> 8 -> 6 -> 5 -> 4 -> 3 ; CWC 2**32 -> 35 -> 7 -> 5 --> 4 --> 3; can window 8 be improved?]
+** applicable to cycle finding
+
+
+== Math string display
+
+* GIF / Unicode (as before), Source (ASCII) and Font-based as a later (but valuable) addition
+** Get or make a CM .woff, and find the tools to make one for the Metamath-bespoke symbols
+** Generally try to come up with a clever CSS rendition
+** Seems to be no reasonable way to passively override copying
+* Allow dynamic abbreviations as kana
+* Math strings should be parsed for display, to insert hierarchy hints
+** bracket size, coloration, or hover-to-show-nesting
+* Intelligent wrapping is nice to have but no good ideas how it should work
+* Fuzzy precedence with de-emphasis of parens that would be implied anyway?  (May depend on user preference.)
+
+== Proof display
+
+* Theorems will be divided into non-exclusive classifications by a combination of rules and tags
+* Possibility to collapse steps based on classifications, (3 prop. steps).  Must support non-collapsed steps nested under collapsed steps, including shared substructure.
+* Create dynamic abbreviations
+* Switch math string display modes
+* Better display of linkage, easily find jump to referred or referring steps
+* Hover for details of referenced theorems
+* Visually distinguish math tokens which a step engages with (matching against a constant) from those that are substituted
+
+== Storage
+
+* No absolutely reliable way to store mutable data in a browser
+* IndexedDB is efficient with large quotas and can be used for read-only mode, or r/w if the user can guarantee no overwrite(?)
+* In memory may be an option - MMOM trees shouldn't exceed 10x the database size
+* Some means to communicate with files is essential.
+
+== Math string editor
+
+* A "late if ever" item, but we may be able to butcher Ace (MIT-licensed fancy editor) into doing something useful.
+* ASCII input, renders in selected display mode
+* Completion/error detection and highlighting on input
+
+== Proof editor
+
+* Command line driven
+* Goal driven, but can rearrange and create new goals
+* With a parser
+* Support most of the MMPFAS commands
+* Built-in metatheorems for common cases
+* Ability for improvement to link to incomplete subtrees; subtree severing and improved editing
+
+== Contextual undo/redo
+
+== Solitaire
+
+* Since the Java Plugin Sandbox has been all but EOLed by Oracle, we need a replacement.  The smm core code would make a good foundation.

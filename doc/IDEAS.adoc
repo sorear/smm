@@ -1,0 +1,7 @@
+LCF-mode verifier
+  Parsing
+  Definitional soundness
+Math display
+  MathJax hack
+Comment formatting
+  ~#callouts
